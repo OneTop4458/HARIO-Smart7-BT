@@ -186,6 +186,11 @@
       <p id="topic-status" class="micro" role="status"></p>
       <div id="topic-content" hidden>
         <p id="topic-byline" class="micro"></p>
+        <div class="recipe-actions" id="topic-translation" hidden>
+          <button class="quiet" type="button" id="translate-topic">브라우저에서 번역</button>
+          <a class="quiet" id="external-topic-translation" target="_blank" rel="noopener noreferrer" hidden>Google 번역에서 열기</a>
+          <span class="micro" id="translation-status" role="status"></span>
+        </div>
         <p id="topic-body" class="post-text"></p>
         <section id="topic-recipe" class="shared-layout" aria-label="추출 설정" hidden>
           <div>
@@ -219,7 +224,7 @@
   </main>
 
   <footer id="footer" class="wrap footer">
-    <span>Smart7 · 0.1.0-beta.3</span>
+    <span>Smart7 · 0.1.0-beta.4</span>
     <div><a href="./EVS-70SV-BT-manual.pdf" target="_blank" rel="noopener noreferrer">본체 설명서</a><a href="https://github.com/OneTop4458/smart7-offline" rel="noopener">GitHub</a></div>
     <small lang="en">Unofficial community project for HARIO Smart7.</small>
   </footer>
@@ -240,6 +245,25 @@
       </div>
       <label>추출 메모 <textarea name="message" rows="3" maxlength="180"></textarea></label>
       <label>출처 URL <input name="source" type="url" pattern="https://.+" maxlength="250" placeholder="선택"></label>
+      <label>작성 언어 <select name="language"><option value="ko">한국어</option><option value="en">English</option><option value="ja">日本語</option></select></label>
+      <details id="post-translations">
+        <summary>다른 언어 번역 추가</summary>
+        <fieldset data-translation="ko">
+          <legend lang="ko">한국어</legend>
+          <label>레시피 이름 <input name="ko-title" maxlength="60" placeholder="선택"></label>
+          <label>추출 메모 <textarea name="ko-notes" rows="2" maxlength="180"></textarea></label>
+        </fieldset>
+        <fieldset data-translation="en">
+          <legend lang="en">English</legend>
+          <label>레시피 이름 <input name="en-title" maxlength="60" placeholder="선택"></label>
+          <label>추출 메모 <textarea name="en-notes" rows="2" maxlength="180"></textarea></label>
+        </fieldset>
+        <fieldset data-translation="ja">
+          <legend lang="ja">日本語</legend>
+          <label>레시피 이름 <input name="ja-title" maxlength="60" placeholder="선택"></label>
+          <label>추출 메모 <textarea name="ja-notes" rows="2" maxlength="180"></textarea></label>
+        </fieldset>
+      </details>
       <fieldset>
         <legend>레시피 사진</legend>
         <div class="photo-tools" id="post-photo-tools" hidden>

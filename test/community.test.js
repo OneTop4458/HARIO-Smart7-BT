@@ -21,7 +21,10 @@ test('a composed issue carries importable brew settings and retains attribution'
     photo: 'data:image/jpeg;base64,/9j/AA==',
     source: { label: 'Recipe source', url: 'https://example.org/recipe' }
   };
-  const link = new URL(recipeProposalUrl(draft, { description: '중간 분쇄로 추출' }));
+  const link = new URL(recipeProposalUrl(draft, {
+    description: '중간 분쇄로 추출', language: 'ko',
+    translations: { en: { title: 'Morning coffee', description: 'Brew with a medium grind' }, ja: { title: '朝のコーヒー' } }
+  }));
   assert.equal(link.hostname, 'github.com');
   assert.equal(link.searchParams.get('template'), 'recipe.md');
   assert.equal(link.searchParams.get('title'), '[레시피] 아침');
@@ -32,6 +35,10 @@ test('a composed issue carries importable brew settings and retains attribution'
   assert.deepEqual(attachment.recipe.steps, draft.steps);
   assert.equal(attachment.recipe.beans, draft.beans);
   assert.equal(attachment.recipe.grind, draft.grind);
+  assert.equal(attachment.language, 'ko');
+  assert.equal(attachment.translations.en.description, 'Brew with a medium grind');
+  assert.equal(issueTitle({ title: '[레시피] 아침' }, attachment, 'en'), 'Morning coffee');
+  assert.equal(issueTitle({ title: '[레시피] 아침' }, attachment, 'ja'), '朝のコーヒー');
   assert.deepEqual(attachment.details, {
     beans: '블렌드', grind: '중간', description: '중간 분쇄로 추출', source: 'https://example.org/recipe'
   });
@@ -53,9 +60,9 @@ test('archival attribution is accepted only on moderation-labeled issues', () =>
   const archived = issueRecipe({ ...issue, labels: [{ name: 'recipe-archive' }] });
   assert.deepEqual(archived.archive, { ...draft.archive, guide: '' });
   assert.deepEqual(archived.recipe.source, draft.source);
-  assert.equal(issueTitle(issue, archived.archive, 'ko'), '원본 제목');
-  assert.equal(issueTitle(issue, archived.archive, 'en'), 'Archived recipe');
-  assert.equal(issueTitle(issue, archived.archive, 'ja'), '保存レシピ');
+  assert.equal(issueTitle(issue, archived, 'ko'), '원본 제목');
+  assert.equal(issueTitle(issue, archived, 'en'), 'Archived recipe');
+  assert.equal(issueTitle(issue, archived, 'ja'), '保存レシピ');
   assert.equal(issueTitle(issue, undefined, 'en'), '원본 제목');
 });
 

@@ -25,16 +25,33 @@ function recipeDetails(record) {
   return { beans: text('beans'), grind: text('grind'), description: text('description'), source: safeHttps(record.source) };
 }
 
+const languages = ['ko', 'en', 'ja'];
+
+function issueTranslations(record) {
+  const entries = languages.flatMap(language => {
+    const fields = record?.[language];
+    if (!fields || typeof fields !== 'object') return [];
+    const values = Object.fromEntries(['title', 'description', 'beans', 'grind'].flatMap(key =>
+      typeof fields[key] === 'string' && fields[key].trim() ? [[key, fields[key].trim()]] : []));
+    return Object.keys(values).length ? [[language, values]] : [];
+  });
+  return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
 export function recipeProposalUrl(recipe, fields) {
   const { name, temperature, grounds, steps, beans, grind } = validateRecipe(recipe);
   const details = recipeDetails({ beans, grind, ...fields, source: fields.source || recipe.source?.url });
+  const originalLanguage = languages.includes(fields.language) ? fields.language : undefined;
+  const translations = issueTranslations(fields.translations);
   const lines = [
     '## 원두 / Beans', details.beans || '—',
     '## 분쇄도 / Grind', details.grind || '—',
     '## 추출 메모 / Brew notes', details.description || '—',
     '## 출처 / Source', details.source || '—',
     '## 사진 / Photo', '<!-- Attach a photo here using GitHub. -->',
-    '## 추출 설정 / Brew settings', ['```json', JSON.stringify({ name, temperature, grounds, steps, details }), '```'].join('\n')
+    '## 추출 설정 / Brew settings', [
+      '```json', JSON.stringify({ name, temperature, grounds, steps, details, language: originalLanguage, translations }), '```'
+    ].join('\n')
   ];
   const url = new URL(repository + '/issues/new');
   url.searchParams.set('template', 'recipe.md');
@@ -49,8 +66,8 @@ export function isCommunityIssue(issue) {
     && (issue.title.startsWith('[레시피]') || hasLabel(issue, 'recipe'));
 }
 
-export function issueTitle(issue, archive, language) {
-  const localized = archive?.titles?.[language];
+export function issueTitle(issue, attachment, language) {
+  const localized = attachment?.archive?.titles?.[language] ?? attachment?.translations?.[language]?.title;
   if (typeof localized === 'string' && localized.trim()) return localized.trim();
   return issue.title.replace(/^\[레시피\]\s*/, '');
 }
@@ -72,7 +89,7 @@ export function issueRecipe(issue) {
   const match = (issue.body || '').match(/^\x60{3}json[ \t]*\r?\n([\s\S]*?)^\x60{3}[ \t]*\r?$/im);
   if (!match) return null;
   try {
-    const { name, temperature, grounds, steps, source, archive, details } = JSON.parse(match[1]);
+    const { name, temperature, grounds, steps, source, archive, details, language, translations } = JSON.parse(match[1]);
     const original = hasLabel(issue, 'recipe-archive') && Number.isSafeInteger(archive?.id)
       ? { ...archive, guide: safeHttps(archive.guide) } : undefined;
     const attribution = original && source ? source : { label: `GitHub · #${issue.number}`, url: issueUrl(issue.number) };
@@ -84,7 +101,10 @@ export function issueRecipe(issue) {
       beans: typeof beans === 'string' ? beans.slice(0, 60) : undefined,
       grind: typeof grind === 'string' ? grind.slice(0, 30) : undefined
     });
-    return { recipe, archive: original, details: metadata, body: issue.body.replace(match[0], '').trim() };
+    return {
+      recipe, archive: original, details: metadata, language: languages.includes(language) ? language : undefined,
+      translations: issueTranslations(translations), body: issue.body.replace(match[0], '').trim()
+    };
   } catch { return null; }
 }
 

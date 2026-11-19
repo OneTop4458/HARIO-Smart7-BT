@@ -6,6 +6,7 @@ import { drawBrewGraph } from './brew-graph.js';
 import { localizeStatic, setLanguage, t } from './i18n.js';
 import { drawRecipeCrop } from './recipe-photo.js';
 import { bindReorder } from './reorder.js';
+import { canTranslateRecipe, translateRecipe, translationLink } from './translate-recipe.js';
 
 const $ = id => document.getElementById(id);
 const auto = $('auto-settings');
@@ -30,6 +31,7 @@ let postDraft;
 let topicNumber;
 let topicRequest = 0;
 let topicRecipe;
+let topicTranslation;
 let selected = '';
 let lastPreview = '';
 let activeRecipe;
@@ -832,7 +834,7 @@ function usePublicCover(image, credit, photo, fallback) {
 function libraryCard(issue) {
   const open = () => go('community/' + issue.number);
   const attachment = issueRecipe(issue);
-  const name = issueTitle(issue, attachment?.archive, document.documentElement.lang) || issue.title;
+  const name = issueTitle(issue, attachment, document.documentElement.lang) || issue.title;
   if (attachment) {
     const fallback = recipePhoto(attachment.archive?.photo).file;
     const item = recipeCard({ ...attachment.recipe, name }, fallback, open);
@@ -931,6 +933,7 @@ async function loadCommunityTopic() {
   $('topic-comments').replaceChildren();
   $('comment-status').textContent = '';
   topicRecipe = null;
+  topicTranslation = null;
   try {
     const archiveId = topic.startsWith('archive-') ? Number(topic.slice(8)) : 0;
     const issue = archiveId
@@ -947,13 +950,18 @@ async function loadCommunityTopic() {
     }
     const attachment = issueRecipe(issue);
     topicRecipe = attachment?.recipe;
-    $('community-title').textContent = issueTitle(issue, attachment?.archive, document.documentElement.lang) || issue.title;
+    const language = document.documentElement.lang;
+    const supplied = attachment?.translations?.[language];
+    const details = supplied ? { ...attachment?.details, ...supplied } : attachment?.details;
+    $('community-title').textContent = issueTitle(issue, attachment, language) || issue.title;
     $('topic-byline').textContent = `#${issue.number} · @${issue.user?.login ?? 'ghost'}`;
     $('topic-body').textContent = attachment?.body ?? issue.body ?? '';
-    $('topic-body').hidden = !!(attachment?.archive || attachment?.details) || !$('topic-body').textContent;
+    $('topic-body').hidden = !!(attachment?.archive || details) || !$('topic-body').textContent;
     $('reply-on-github').href = issueUrl(issue.number);
     $('topic-recipe').hidden = !topicRecipe;
-    if (topicRecipe) renderSharedDetail(topicRecipe, attachment.archive, attachment.details, issueImage(issue));
+    const photo = issueImage(issue);
+    if (topicRecipe) renderSharedDetail(topicRecipe, attachment.archive, details, photo);
+    updateTopicTranslation(issue, attachment, details, supplied, photo);
     $('topic-status').textContent = '';
     $('topic-content').hidden = false;
     if (topicRecipe) requestAnimationFrame(() => {
@@ -981,6 +989,55 @@ async function loadCommunityTopic() {
     status.textContent = t('게시판을 불러오지 못했습니다. GitHub에서 볼 수 있습니다.');
   }
 }
+
+function updateTopicTranslation(issue, attachment, details, supplied, photo) {
+  const target = document.documentElement.lang;
+  const source = attachment?.language;
+  const original = attachment?.details;
+  const fields = {
+    title: supplied?.title ? '' : issueTitle(issue),
+    description: supplied?.description ? '' : original?.description || (!details ? $('topic-body').textContent : ''),
+    beans: supplied?.beans ? '' : original?.beans,
+    grind: supplied?.grind ? '' : original?.grind
+  };
+  const available = !attachment?.archive && source !== target && Object.values(fields).some(Boolean);
+  $('topic-translation').hidden = !available;
+  $('translation-status').textContent = '';
+  if (!available) return;
+  const native = canTranslateRecipe(source);
+  $('translate-topic').hidden = !native;
+  $('translate-topic').disabled = false;
+  $('external-topic-translation').hidden = native;
+  $('external-topic-translation').href = translationLink(fields, target, source);
+  topicTranslation = { fields, source, target, attachment, details, photo };
+}
+
+$('translate-topic').addEventListener('click', async () => {
+  const request = topicTranslation;
+  if (!request) return;
+  const { fields, target, source, attachment, details, photo } = request;
+  const button = $('translate-topic');
+  button.disabled = true;
+  $('translation-status').textContent = t('번역 중…');
+  const current = () => topicTranslation === request && route === 'community-topic';
+  try {
+    const translated = await translateRecipe(fields, target, source);
+    if (!current()) return;
+    if (translated.title) $('community-title').textContent = translated.title;
+    if (attachment?.recipe) renderSharedDetail(attachment.recipe, undefined, { ...details, ...translated }, photo);
+    else if (translated.description) $('topic-body').textContent = translated.description;
+    $('topic-translation').hidden = true;
+  } catch {
+    if (!current()) return;
+    $('translation-status').textContent = t('브라우저 번역을 사용할 수 없습니다.');
+    $('external-topic-translation').hidden = false;
+  } finally {
+    if (current()) {
+      button.disabled = false;
+      if ($('topic-translation').hidden) $('translation-status').textContent = '';
+    }
+  }
+});
 
 function selectedPostRecipe() {
   const value = postForm.elements.namedItem('recipe').value;
@@ -1010,6 +1067,9 @@ function updatePostRecipe() {
 
 function openPost(draft) {
   postForm.reset();
+  postForm.elements.namedItem('language').value = document.documentElement.lang;
+  $('post-translations').open = false;
+  showPostTranslationFields();
   postDraft = draft;
   const picker = postForm.elements.namedItem('recipe');
   const options = recipes.map(recipe => new Option(recipe.name, recipe.id));
@@ -1021,6 +1081,11 @@ function openPost(draft) {
   postDialog.showModal();
 }
 
+function showPostTranslationFields() {
+  const source = postForm.elements.namedItem('language').value;
+  for (const fields of postForm.querySelectorAll('[data-translation]')) fields.hidden = fields.dataset.translation === source;
+}
+
 $('new-community-post').addEventListener('click', () => openPost());
 $('propose-recipe').addEventListener('click', () => {
   try { openPost(validateRecipe(formRecipe())); }
@@ -1028,14 +1093,19 @@ $('propose-recipe').addEventListener('click', () => {
 });
 $('new-post-recipe').addEventListener('click', () => { postDialog.close(); openSavedRecipe(''); });
 postForm.elements.namedItem('recipe').addEventListener('change', updatePostRecipe);
+postForm.elements.namedItem('language').addEventListener('change', showPostTranslationFields);
 postForm.addEventListener('submit', event => {
   event.preventDefault();
   const selectedRecipe = selectedPostRecipe();
   if (!selectedRecipe) return;
-  const { title, message, beans, grind, source } = postForm.elements;
+  const { title, message, beans, grind, source, language } = postForm.elements;
+  const translations = Object.fromEntries(['ko', 'en', 'ja'].filter(code => code !== language.value).map(code => [code, {
+    title: postForm.elements.namedItem(code + '-title').value,
+    description: postForm.elements.namedItem(code + '-notes').value
+  }]));
   try {
     const url = recipeProposalUrl({ ...selectedRecipe, name: title.value }, {
-      beans: beans.value, grind: grind.value, description: message.value, source: source.value
+      beans: beans.value, grind: grind.value, description: message.value, source: source.value, language: language.value, translations
     });
     window.open(url, '_blank', 'noopener,noreferrer');
     postDialog.close();

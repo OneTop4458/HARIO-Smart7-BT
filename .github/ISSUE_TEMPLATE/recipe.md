@@ -20,3 +20,4 @@ labels: recipe
 ## 추출 설정 / Brew settings
 
 <!-- 웹앱에서 레시피 공유를 누르면 온도와 추출 단계가 자동으로 첨부됩니다. / Use Share recipe in the app to attach the brew settings. -->
+<!-- 다른 언어 번역은 공유 양식에서 같은 이슈에 추가할 수 있습니다. / Add translations to this same issue using the share form. -->
