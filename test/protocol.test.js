@@ -98,7 +98,7 @@ test('connection guidance distinguishes an empty selection, blocked access and a
 
   bluetooth.requestDevice = async () => { throw new DOMException('Permission denied', 'SecurityError'); };
   await device.connect();
-  assert.match(device.state.message, /앱 권한을 확인/);
+  assert.match(device.state.message, /브라우저 앱의 권한을 확인/);
 
   const selection = Object.assign(new EventTarget(), {
     name: 'EVS-70SV-BT',

@@ -1,8 +1,9 @@
 import { validateRecipe } from './recipes.js';
 
-const repository = 'https://github.com/OneTop4458/smart7-offline';
+const repoPath = 'OneTop4458/HARIO-Smart7-BT';
+const repository = 'https://github.com/' + repoPath;
 const apiOrigin = 'https://api.github.com';
-const api = apiOrigin + '/repos/OneTop4458/smart7-offline/issues';
+const api = apiOrigin + '/repos/' + repoPath + '/issues';
 
 function hasLabel(issue, name) {
   return issue.labels?.some(label => label.name === name);

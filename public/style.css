@@ -27,7 +27,6 @@ button:disabled { opacity: .55; cursor: default; }
 [hidden] { display: none !important; }
 .wrap { width: min(1020px, 100% - 48px); margin-inline: auto; }
 .micro { font-size: .87rem; color: var(--muted); }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 .site-header { min-height: 70px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 1; background: #28333d; }
 .site-header .back-button { min-width: 42px; padding: 0; line-height: 1; font-size: 1.76rem; }
@@ -49,7 +48,9 @@ button:disabled { opacity: .55; cursor: default; }
 #home { min-height: auto; display: grid; grid-template-columns: 1.1fr 1fr; gap: clamp(16px, 4vw, 38px); padding-bottom: 16px; }
 .home-photo { min-height: 240px; position: relative; overflow: hidden; border-radius: 16px; background: var(--dark); }
 .home-photo img { display: block; width: 100%; height: 100%; position: absolute; object-fit: cover; object-position: center 56%; }
-.home-photo p { position: absolute; inset: auto 0 0; margin: 0; padding: 36px 17px 14px; background: linear-gradient(transparent, #130d0bd9); font-size: 1.12rem; font-weight: 650; }
+.home-caption { position: absolute; inset: auto 0 0; padding: 36px 17px 14px; background: linear-gradient(transparent, #130d0bed 48%); }
+.home-caption h1 { margin: 0; font-size: 1.3rem; line-height: 1.2; }
+.home-caption p { margin: 4px 0 0; font-size: .9rem; line-height: 1.35; }
 .console-menu { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .mode-label { display: grid; grid-template-columns: auto auto; align-items: end; align-content: space-between; gap: 8px; min-height: 94px; padding: 12px 15px; border: 1px solid var(--line); border-radius: 13px; background: #334350; color: var(--ink); font-weight: 700; transition: background-color 160ms ease; }
 .mode-label:hover { background: #43586a; color: var(--ink); }

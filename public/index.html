@@ -4,8 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#20262d">
-  <meta name="description" content="HARIO Smart7 BT를 블루투스로 연결해 추출을 제어하는 웹앱.">
-  <title>Smart7</title>
+  <title>HARIO Smart7 BT | Open-Source Web Bluetooth App</title>
+  <meta name="description" content="An open-source community app for the HARIO V60 Auto Pour Over Smart7 BT (EVS-70SV-BT). Brew over Web Bluetooth, save recipes, and browse shared coffee recipes.">
+  <link rel="canonical" href="https://smart7-offline.vercel.app/">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://smart7-offline.vercel.app/">
+  <meta property="og:title" content="HARIO Smart7 BT | Open-Source Web Bluetooth App">
+  <meta property="og:description" content="A community brewing app for the HARIO V60 Auto Pour Over Smart7 BT (EVS-70SV-BT).">
+  <meta property="og:image" content="https://smart7-offline.vercel.app/coffee.webp">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "HARIO Smart7 BT Community App",
+      "url": "https://smart7-offline.vercel.app/"
+    }
+  </script>
   <link rel="icon" href="./icon-192.png">
   <link rel="apple-touch-icon" href="./icon-192.png">
   <link rel="manifest" href="./app.webmanifest">
@@ -25,7 +39,6 @@
   </header>
 
   <main class="wrap">
-    <h1 class="sr-only">Smart7</h1>
     <div class="device-strip">
       <span class="model">EVS-70SV-BT</span>
       <span class="connection-label"><i id="connection-dot" aria-hidden="true"></i><span id="connection" role="status">연결 안 됨</span></span>
@@ -35,7 +48,10 @@
     <section id="home" class="screen">
       <div class="home-photo">
         <img src="./coffee.webp" alt="" width="1080" height="720">
-        <p>V60 Auto Pour Over</p>
+        <div class="home-caption">
+          <h1>HARIO Smart7 BT</h1>
+          <p>V60 Auto Pour Over(EVS-70SV-BT)를 Web Bluetooth로 제어하는 커뮤니티 앱입니다.</p>
+        </div>
       </div>
       <nav class="console-menu" aria-label="Smart7 메뉴">
         <a class="mode-label" href="#auto"><span class="menu-symbol" aria-hidden="true">◷</span><span>자동 모드</span><span aria-hidden="true">›</span></a>
@@ -225,7 +241,7 @@
 
   <footer id="footer" class="wrap footer">
     <span>Smart7 · 0.1.0-beta.6</span>
-    <div><a href="./EVS-70SV-BT-manual.pdf" target="_blank" rel="noopener noreferrer">본체 설명서</a><a href="https://github.com/OneTop4458/smart7-offline" rel="noopener">GitHub</a></div>
+    <div><a href="./EVS-70SV-BT-manual.pdf" target="_blank" rel="noopener noreferrer">본체 설명서</a><a href="https://github.com/OneTop4458/HARIO-Smart7-BT" rel="noopener">GitHub</a></div>
     <small lang="en">Unofficial community project for HARIO Smart7.</small>
   </footer>
 

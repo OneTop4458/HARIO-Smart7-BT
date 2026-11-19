@@ -102,9 +102,9 @@ export class Smart7 {
       if (this.operation !== attempt) return;
       let message = error.message;
       if (!reuse && error.name === 'NotFoundError') {
-        message = '선택된 기기가 없습니다. Smart7이 보이지 않으면 공식 앱의 연결을 해제하고 Chrome의 주변 기기 권한을 확인하세요.';
+        message = '선택된 기기가 없습니다. Smart7이 보이지 않으면 공식 앱의 연결을 해제하고 브라우저의 블루투스 권한을 확인하세요.';
       } else if (!reuse && (error.name === 'NotAllowedError' || error.name === 'SecurityError')) {
-        message = 'Chrome의 사이트 블루투스 설정과 휴대폰의 Chrome 앱 권한을 확인한 뒤 BT 연결을 다시 누르세요.';
+        message = '사이트의 블루투스 설정과 브라우저 앱의 권한을 확인한 뒤 BT 연결을 다시 누르세요.';
       }
       this.disconnect(message);
     }

@@ -85,13 +85,8 @@ const deviceAlerts = {
   'rinse-complete': ['헹굼 완료', '헹굼이 완료됐습니다.'],
   'brew-complete': ['추출 완료', '추출이 완료됐습니다.']
 };
-const userAgent = navigator.userAgent;
-const appleMobile = /iPhone|iPad|iPod/i.test(userAgent)
-  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const android = navigator.userAgentData?.platform === 'Android' || /Android/i.test(userAgent);
-const chrome = !/(?:SamsungBrowser|Edg(?:A|iOS)?|OPR|Opera|Whale|Vivaldi|YaBrowser|DuckDuckGo|MiuiBrowser|HuaweiBrowser|KAKAOTALK)\/|; wv\)/i.test(userAgent)
-  && (navigator.userAgentData?.brands?.some(({ brand }) => brand === 'Google Chrome') ?? /Chrome\//i.test(userAgent));
-const supported = !appleMobile && window.isSecureContext && !!navigator.bluetooth;
+const supported = window.isSecureContext && typeof navigator.bluetooth?.requestDevice === 'function';
+const bluetoothHelp = '이 브라우저에서는 Web Bluetooth를 사용할 수 없습니다. 기기 연결은 Android 또는 데스크톱에서 최신 Chrome으로 시도하세요.';
 const screenParents = { auto: 'home', recipes: 'home', editor: 'recipes', library: 'home', 'community-topic': 'library', maintenance: 'home' };
 const sections = [...document.querySelectorAll('.screen')];
 const listScroll = new Map();
@@ -164,12 +159,9 @@ function go(hash, replace = false) {
 }
 
 function renderCompatibility() {
-  let message = '기기 선택 창에서 EVS-70을 선택하세요.';
-  if (appleMobile) message = 'Smart7 본체를 연결하려면 Android Chrome으로 접속해 주세요.';
-  else if (!chrome) message = 'Smart7을 연결하려면 Google Chrome에서 이 주소를 다시 열어 주세요.';
-  else if (!supported) message = '블루투스 연결은 HTTPS에서 Android 또는 데스크톱 Chrome을 사용하세요.';
-  else if (android) message = '권한 요청이 나오면 허용하고 기기 선택 창에서 EVS-70을 선택하세요.';
-  $('compatibility').textContent = t(message);
+  $('compatibility').textContent = t(supported
+    ? '권한 요청이 나오면 허용하고 기기 선택 창에서 EVS-70을 선택하세요.'
+    : bluetoothHelp);
 }
 
 function formRecipe() {
@@ -1331,18 +1323,13 @@ function reconnectSaved() {
   if (supported && navigator.bluetooth.getDevices && localStorage.getItem('smart7-device')) void brewer.connect(true);
 }
 
-if (appleMobile || !chrome || android) {
+if (!supported) {
   const dialog = $('platform-dialog');
   const locale = browserLanguage();
   const notice = key => t(key, undefined, locale);
   dialog.lang = locale;
-  $('platform-title').textContent = notice(appleMobile ? 'iPhone·iPad 연결 미지원' : chrome ? '블루투스 권한을 허용해 주세요' : 'Chrome에서 열어 주세요');
-  $('platform-message').textContent = notice(appleMobile
-    ? 'iPhone과 iPad에서는 Smart7 본체에 연결할 수 없습니다. Android 기기의 Chrome에서 이 주소를 다시 열어 주세요.'
-    : chrome
-      ? 'BT 연결을 누르고 Chrome에서 주변 기기 권한을 허용하세요. EVS-70을 고른 뒤 선택창의 페어링 또는 연결 버튼을 누르세요.'
-      : 'Smart7을 연결하려면 Google Chrome에서 이 주소를 다시 열어 주세요.');
+  $('platform-title').textContent = notice('지원하지 않는 브라우저');
+  $('platform-message').textContent = notice(bluetoothHelp);
   dialog.querySelector('button').textContent = notice('확인');
-  if (chrome) dialog.addEventListener('close', reconnectSaved, { once: true });
   dialog.showModal();
 } else reconnectSaved();

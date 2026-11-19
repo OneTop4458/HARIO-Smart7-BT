@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://smart7-offline.vercel.app/sitemap.xml
