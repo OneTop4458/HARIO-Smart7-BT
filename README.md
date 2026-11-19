@@ -26,7 +26,7 @@ npm test
 python -m http.server 8080 --directory public
 ```
 
-[localhost:8080](http://localhost:8080)에서 엽니다. GitHub Actions는 PR과 `main` 변경을 테스트합니다. Vercel은 `main`의 빌드에서 테스트를 통과하면 운영 배포합니다.
+[localhost:8080](http://localhost:8080)에서 엽니다. 로컬 정적 서버는 GitHub API를 직접 조회하고, 운영판은 공개 레시피 조회에 Vercel의 공유 캐시를 사용합니다. GitHub Actions는 PR과 `main` 변경을 테스트합니다. Vercel은 빌드 테스트를 통과하면 운영 배포합니다.
 
 ## 라이선스
 

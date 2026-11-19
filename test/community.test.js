@@ -80,10 +80,11 @@ test('the issue list follows pagination and excludes closed topics from direct l
   const issue = { state: 'open', title: '[레시피] Fixture', labels: [], number: 12 };
   const fetch = context.mock.method(globalThis, 'fetch', async url => {
     if (url === next) return Response.json([{ ...issue, number: 14 }]);
-    if (url.endsWith('/13')) return Response.json({ ...issue, number: 13, state: 'closed' });
-    return Response.json([issue, { ...issue, pull_request: {} }], { headers: { link: `<${next}>; rel="next"` } });
+    return Response.json([issue, { ...issue, number: 13, state: 'closed' }, { ...issue, pull_request: {} }], {
+      headers: { link: `<${next}>; rel="next"` }
+    });
   });
   assert.deepEqual((await listCommunityIssues()).map(item => item.number), [12, 14]);
   assert.equal(await getCommunityIssue(13), null);
-  assert.equal(fetch.mock.callCount(), 3);
+  assert.ok(fetch.mock.calls.every(call => !call.arguments[0].endsWith('/13')));
 });

@@ -913,9 +913,10 @@ async function loadCommunityBoard() {
   try {
     const issues = await listCommunityIssues();
     list.replaceChildren(...issues.map(libraryCard));
-  } catch {
-    list.replaceChildren();
-    $('community-status').textContent = t('공개 레시피를 불러오지 못했습니다.');
+  } catch (error) {
+    $('community-status').textContent = t(error.code === 'rate-limit'
+      ? 'GitHub 조회 한도에 도달했습니다. 잠시 후 새로고침해 주세요.'
+      : '공개 레시피를 불러오지 못했습니다.');
     $('community-status').hidden = false;
   } finally {
     list.setAttribute('aria-busy', 'false');
@@ -983,10 +984,12 @@ async function loadCommunityTopic() {
       row.append(author, body);
       return row;
     }));
-  } catch {
+  } catch (error) {
     if (!current()) return;
     const status = $('topic-content').hidden ? $('topic-status') : $('comment-status');
-    status.textContent = t('게시판을 불러오지 못했습니다. GitHub에서 볼 수 있습니다.');
+    status.textContent = t(error.code === 'rate-limit'
+      ? 'GitHub 조회 한도에 도달했습니다. 잠시 후 새로고침해 주세요.'
+      : '게시판을 불러오지 못했습니다. GitHub에서 볼 수 있습니다.');
   }
 }
 

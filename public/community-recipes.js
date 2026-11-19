@@ -111,7 +111,13 @@ export function issueRecipe(issue) {
 async function getGitHub(url) {
   const response = await fetch(url, { cache: 'no-cache', signal: AbortSignal.timeout(10000) });
   if (response.status === 404) return { data: null };
-  if (!response.ok) throw new Error(`GitHub returned HTTP ${response.status}`);
+  if (!response.ok) {
+    const error = new Error(`GitHub returned HTTP ${response.status}`);
+    if (response.status === 429 || (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0')) {
+      error.code = 'rate-limit';
+    }
+    throw error;
+  }
   const next = response.headers.get('link')?.match(/<([^>]+)>;\s*rel="next"/)?.[1];
   return { data: await response.json(), next: next && new URL(next).origin === apiOrigin ? next : null };
 }
@@ -128,15 +134,35 @@ async function listGitHub(path) {
   return items;
 }
 
-export async function listCommunityIssues() {
+export async function fetchGitHubIssues() {
   return (await listGitHub('?state=open&sort=updated&per_page=100')).filter(isCommunityIssue);
 }
 
-export async function getCommunityIssue(number) {
-  const { data: issue } = await getGitHub(`${api}/${number}`);
-  return isCommunityIssue(issue) ? issue : null;
+export function fetchGitHubComments(number) {
+  return listGitHub(`/${number}/comments?per_page=100`);
 }
 
-export function listIssueComments(number) {
-  return listGitHub(`/${number}/comments?per_page=100`);
+let relayAvailable = typeof window !== 'undefined';
+
+async function readRelay(query = '') {
+  if (!relayAvailable) return null;
+  try {
+    const response = await fetch(`/api/community${query}`, { signal: AbortSignal.timeout(10000) });
+    if (response.status === 404) relayAvailable = false;
+    if (!response.ok) return null;
+    const data = await response.json();
+    return Array.isArray(data) ? data : null;
+  } catch { return null; }
+}
+
+export async function listCommunityIssues() {
+  return await readRelay() ?? fetchGitHubIssues();
+}
+
+export async function getCommunityIssue(number) {
+  return (await listCommunityIssues()).find(issue => issue.number === Number(number)) ?? null;
+}
+
+export async function listIssueComments(number) {
+  return await readRelay(`?comments=${number}`) ?? fetchGitHubComments(number);
 }

@@ -40,6 +40,7 @@ const copy = {
   '게시판을 불러오는 중…': ['Loading the board…', '掲示板を読み込み中…'],
   '게시판을 불러오지 못했습니다. GitHub에서 볼 수 있습니다.': ['Could not load the board. You can view it on GitHub.', '掲示板を読み込めませんでした。GitHubで確認できます。'],
   '공개 레시피를 불러오지 못했습니다.': ['Could not load shared recipes.', '公開レシピを読み込めませんでした。'],
+  'GitHub 조회 한도에 도달했습니다. 잠시 후 새로고침해 주세요.': ['GitHub’s request limit was reached. Try refreshing in a moment.', 'GitHubの読み込み上限に達しました。しばらくしてから更新してください。'],
   '글이 닫혔거나 삭제되었습니다.': ['This post was closed or deleted.', 'この投稿は閉じられたか削除されました。'],
   '댓글': ['Comments', 'コメント'],
   '댓글 {count}개': ['{count} comments', 'コメント{count}件'],
