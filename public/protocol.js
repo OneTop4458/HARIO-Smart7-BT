@@ -50,6 +50,8 @@ export class Smart7 {
     this.onChange = onChange;
     this.state = { connection: 'disconnected', phase: 'idle', alert: null, message: '', temperature: null, seconds: null, level: null };
     this.stageTimer = null;
+    this.calibrating = false;
+    this.calibrationAlerted = false;
     this.pending = new Uint8Array();
     this.queue = Promise.resolve();
     this.operation = 0;
@@ -62,14 +64,14 @@ export class Smart7 {
     this.onChange(this.state);
   }
 
-  async connect(reuse = false) {
+  async connect(reuse = false, savedId) {
     if (this.state.connection !== 'disconnected') return;
     this.update({ connection: 'connecting', message: '', phase: 'idle' });
     try {
       const bluetooth = navigator.bluetooth;
       if (!bluetooth) throw new Error('이 브라우저에서 Web Bluetooth를 사용할 수 없습니다.');
       const device = reuse
-        ? (await bluetooth.getDevices()).find(item => item.id === localStorage.getItem('smart7-device'))
+        ? (await bluetooth.getDevices()).find(item => item.id === (savedId ?? localStorage.getItem('smart7-device')))
         : await bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: [SERVICE] });
       if (!device) throw new Error('저장된 기기를 찾지 못했습니다. 기기 연결에서 다시 선택하세요.');
       if (!device.name?.includes('EVS-70')) throw new Error('목록에서 이름에 EVS-70이 포함된 Smart7 BT를 선택하세요.');
@@ -101,6 +103,7 @@ export class Smart7 {
     this.device = this.writer = this.notifier = this.expectedPin = null;
     this.pending = new Uint8Array();
     this.operation++;
+    this.calibrationAlerted = false;
     this.update({ connection: 'disconnected', phase: 'idle', alert: null, message, temperature: null, seconds: null, level: null });
   }
 
@@ -173,10 +176,13 @@ export class Smart7 {
     const brewBusy = phase === 'starting' && ((mode === 2 && (step === 2 || step === 3)) || mode === 3 || mode === 4);
     const drainBusy = phase === 'draining' && (mode === 2 || mode === 4);
     const cleaningBusy = (phase === 'checking-clean' || phase === 'cleaning') && (mode === 2 || mode === 3);
-    if (brewBusy || drainBusy || cleaningBusy) {
+    const calibrationBusy = this.calibrating && !this.calibrationAlerted && this.state.connection === 'ready'
+      && (phase === 'idle' || phase === 'complete') && (mode === 2 || mode === 3 || mode === 4);
+    if (brewBusy || drainBusy || cleaningBusy || calibrationBusy) {
       this.operation++;
       this.clearStageTimer();
-      this.alertPhase = phase;
+      this.alertPhase = calibrationBusy ? 'calibration' : phase;
+      if (calibrationBusy) this.calibrationAlerted = true;
       this.update({ phase: 'idle', alert: 'busy', message: '기기가 사용 중입니다.', temperature: null, seconds: null });
       return;
     }
@@ -184,7 +190,7 @@ export class Smart7 {
       if (mode === 2 && step === 1 && phase !== 'paused') this.update({ phase: 'heating', temperature: first });
       if (mode === 2 && step === 2 && phase !== 'paused') this.update({ phase: 'brewing', seconds: first * 60 + second });
       if (mode === 1 && step === 1 && first === 0 && second === 0 && (phase === 'heating' || phase === 'brewing')) {
-        this.update({ phase: 'complete', seconds: 0 });
+        this.update({ phase: 'complete', alert: 'brew-complete', seconds: 0 });
       }
     }
     if (phase === 'draining' && mode === 3 && step === 1) {
@@ -208,13 +214,14 @@ export class Smart7 {
   async acknowledgeAlert(drain = false) {
     const { alert } = this.state;
     if (!alert) return;
+    const alertsWithMessage = { 'rinse-complete': '헹굼이 완료됐습니다.', 'brew-complete': '추출이 완료됐습니다.' };
     try {
-      if (alert === 'busy') await this.cancelOperation(this.alertPhase);
+      if (alert === 'busy' && this.alertPhase !== 'calibration') await this.cancelOperation(this.alertPhase);
       else if (alert === 'overheat' && !drain) await this.send(2, [3]);
     } finally {
-      this.update({ alert: null, message: alert === 'rinse-complete' ? '헹굼이 완료됐습니다.' : '' });
+      this.update({ alert: null, message: alertsWithMessage[alert] ?? '' });
     }
-    if (alert === 'overheat' && drain) await this.drain();
+    return alert === 'overheat' && drain;
   }
 
   async acceptPin(input, remember) {
@@ -235,6 +242,11 @@ export class Smart7 {
   checkReady() {
     if (this.state.connection !== 'ready') throw new Error('먼저 본체 연결과 PIN 확인을 완료하세요.');
     if (this.state.alert || workingPhases.includes(this.state.phase)) throw new Error('진행 중인 작업을 먼저 종료하세요.');
+  }
+
+  async prepareBrew() {
+    this.checkReady();
+    await this.send(3, [2]);
   }
 
   async brew(input) {
@@ -355,6 +367,11 @@ export class Smart7 {
     this.checkReady();
     this.update({ level: null });
     await this.send(12, [0]);
+  }
+
+  showCalibration(open) {
+    this.calibrating = open;
+    this.calibrationAlerted = false;
   }
 
   async setFlow(level) {

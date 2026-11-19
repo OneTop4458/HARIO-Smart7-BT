@@ -39,6 +39,7 @@ button:disabled { opacity: .55; cursor: default; }
 .model { font-family: ui-monospace, monospace; color: var(--muted); font-size: .82rem; letter-spacing: .05em; }
 .device-strip #offline-status { margin-left: auto; }
 .connection-label { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: .85rem; }
+.connection-label span { overflow-wrap: anywhere; }
 #connection-dot { width: 7px; height: 7px; border-radius: 50%; background: #8793a3; }
 #connection-dot.ready { background: var(--olive); }
 #connection-dot.pending { background: #ffd291; }
@@ -99,10 +100,11 @@ legend { margin-bottom: 8px; }
 input:not([type=radio], [type=checkbox], [type=file]), select { height: 41px; width: 100%; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); color: var(--ink); padding: 6px 10px; }
 .form-row input, .form-row select, .recipe-step input, dialog label:not(.check) input { display: block; margin-top: 5px; }
 .recipe-steps #steps { display: grid; gap: 8px; margin-bottom: 9px; }
-.recipe-step { display: grid; grid-template-columns: 26px repeat(3, minmax(0, 1fr)) 36px; gap: 6px; align-items: end; }
+.recipe-step { display: grid; grid-template-columns: 24px repeat(3, minmax(0, 1fr)) auto; gap: 6px; align-items: end; }
 .recipe-step .number { font-size: .8rem; color: var(--muted); padding-bottom: 9px; }
 .recipe-step label { font-size: .73rem; }
 .recipe-step button { padding-inline: 6px; }
+.step-buttons { display: flex; gap: 3px; }
 .recipe-actions, .maintenance-actions { display: flex; align-items: end; flex-wrap: wrap; gap: 8px; }
 .file-label { cursor: pointer; position: relative; }
 .file-label:focus-within { outline: 3px solid #ab633c; outline-offset: 3px; }
@@ -134,6 +136,12 @@ summary { cursor: pointer; }
 .maintenance details p { color: var(--muted); margin: 10px 0; max-width: 60ch; }
 .maintenance details > .maintenance-actions:not(p + div) { margin-top: 12px; }
 .maintenance input { display: block; width: 88px !important; margin-top: 5px; }
+.maintenance .alias-form { margin-top: 10px; }
+.alias-form input { width: min(160px, 100%) !important; }
+.flow-levels { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px; margin: 10px 0; }
+.flow-levels button { padding-inline: 3px; }
+.flow-levels button.is-filled { background: #405364; }
+.flow-levels button[aria-pressed=true] { border-color: var(--accent); }
 .language-setting { display: flex; align-items: center; gap: 14px; max-width: 260px; margin-block: 18px 0; }
 .language-setting select { flex: 1; }
 .footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 14px 0 36px; color: var(--muted); font-size: .82rem; }
@@ -145,7 +153,14 @@ dialog::backdrop { background: #0b1118c5; }
 dialog p { color: var(--muted); }
 dialog .check { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .check input { accent-color: var(--accent); width: 16px; height: 16px; }
-.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 19px; }
+.dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 19px; }
+#photo-crop { display: block; max-width: 100%; height: auto; margin: 12px auto; }
+.crop-controls { display: grid; gap: 6px; }
+.crop-controls label { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.crop-controls input[type=range] { width: 62%; height: auto; margin: 0; padding: 0; }
+#brew-result img { border-radius: 4px; object-fit: cover; }
+#brew-result-values { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; margin-block: 12px; }
+#brew-result-values dd { margin: 0; font-weight: 650; }
 .error { color: #ffc4b7; }
 
 .library-dialog { width: min(580px, 100% - 32px); max-height: 85dvh; }
@@ -175,6 +190,8 @@ dialog .check { display: flex; align-items: center; gap: 8px; margin-top: 10px; 
   .mode-label { min-height: 50px; padding: 7px 13px; }
   .mode-label img { width: 34px; height: 34px; }
   .brew-layout { grid-template-columns: 1fr; gap: 16px; }
+  .recipe-step { grid-template-columns: 23px repeat(3, minmax(0, 1fr)); }
+  .step-buttons { grid-column: 2 / -1; justify-content: flex-end; margin-bottom: 4px; }
   .maintenance { margin-top: 27px; }
 }
 @media (prefers-reduced-motion: reduce) {

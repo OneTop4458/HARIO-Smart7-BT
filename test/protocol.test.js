@@ -92,7 +92,7 @@ test('a busy brewer cancels queued preparation and waits for acknowledgement', a
   assert.equal(device.state.alert, null);
 });
 
-test('overheat stops brewing and only drains when explicitly requested', async () => {
+test('overheat stops brewing and opens drain preparation before a separate start', async () => {
   const device = new Smart7(() => {});
   const writes = [];
   device.send = async (command, payload = []) => { writes.push([command, ...payload]); };
@@ -100,9 +100,37 @@ test('overheat stops brewing and only drains when explicitly requested', async (
   await device.handleFrame({ command: 3, data: [3] });
   assert.equal(device.state.alert, 'overheat');
   assert.deepEqual(writes, [[2, 3]]);
-  await device.acknowledgeAlert(true);
+  assert.equal(await device.acknowledgeAlert(true), true);
+  assert.equal(device.state.phase, 'idle');
+  assert.deepEqual(writes, [[2, 3]]);
+  await device.drain();
   assert.equal(device.state.phase, 'draining');
   assert.deepEqual(writes, [[2, 3], [3, 1]]);
+});
+
+test('tank confirmation and flow calibration respect the appliance workflow', async () => {
+  const device = new Smart7(() => {});
+  const writes = [];
+  device.send = async (command, payload = []) => { writes.push([command, ...payload]); };
+  device.update({ connection: 'ready' });
+  await device.prepareBrew();
+  device.showCalibration(true);
+  await device.readFlow();
+  await device.handleFrame({ command: 2, data: [3, 1, 0, 0] });
+  assert.equal(device.state.alert, 'busy');
+  await device.acknowledgeAlert();
+  assert.deepEqual(writes, [[3, 2], [12, 0]]);
+});
+
+test('the device completion frame opens the brew summary without sending a command', async () => {
+  const device = new Smart7(() => {});
+  device.send = async () => assert.fail('completion must not write to GATT');
+  device.update({ connection: 'ready', phase: 'brewing' });
+  await device.handleFrame({ command: 2, data: [1, 1, 0, 0] });
+  assert.equal(device.state.alert, 'brew-complete');
+  await device.acknowledgeAlert();
+  assert.equal(device.state.phase, 'complete');
+  assert.equal(device.state.alert, null);
 });
 
 test('rinse timer begins on device progress and completion sends no command', async ({ mock }) => {

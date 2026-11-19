@@ -60,11 +60,14 @@
               <label>물 온도 <select name="temperature"><option value="90">90 °C</option><option value="93" selected>93 °C</option><option value="96">96 °C</option></select></label>
               <label>추출 속도 <select name="speed"><option value="normal">기본</option><option value="fast">빠르게</option></select></label>
             </div>
-            <div class="recipe-actions"><button type="button" id="save-auto" class="quiet">내 레시피로 저장</button></div>
+            <div class="recipe-actions"><button type="button" id="save-auto" class="quiet">내 레시피로 저장</button><button type="button" id="replace-auto" class="quiet" hidden>저장한 레시피 덮어쓰기</button></div>
           </form>
 
           <form id="custom-settings" class="settings" aria-label="내 레시피 편집" hidden>
             <div class="form-row saved-row"><label>저장한 레시피 <select id="saved-recipes"><option value="">새 레시피</option></select></label><button type="button" id="new-recipe" class="quiet">새로 만들기</button></div>
+            <div class="recipe-actions" id="recipe-order" hidden>
+              <button type="button" id="recipe-up" class="quiet">레시피 위로</button><button type="button" id="recipe-down" class="quiet">레시피 아래로</button>
+            </div>
             <div class="form-row"><label>레시피 이름 <input name="name" maxlength="60" required></label><label>물 온도 (°C) <input type="number" name="temperature" min="80" max="96" value="93" required></label></div>
             <div class="form-row recipe-details">
               <label>원두량 (g) <input type="number" name="grounds" min="0" max="100" step="any" placeholder="선택"></label>
@@ -80,6 +83,7 @@
               </div>
             </fieldset>
             <fieldset class="recipe-steps"><legend>추출 단계</legend>
+              <p class="micro">첫 뜸들이기 단계는 자리를 유지합니다.</p>
               <div id="steps"></div>
               <button id="add-step" class="quiet" type="button">단계 추가</button>
             </fieldset>
@@ -89,8 +93,17 @@
               <button type="button" class="quiet" id="export-recipe">이 레시피 내보내기</button>
               <button type="button" class="quiet" id="export-recipes">전체 내보내기</button>
               <button type="button" class="quiet" id="copy-recipe" hidden>복제</button>
+              <button type="button" class="quiet" id="replace-recipe" hidden>다른 레시피에 덮어쓰기</button>
               <button type="button" id="delete-recipe" class="quiet" hidden>삭제</button>
             </div>
+            <details>
+              <summary>구형 앱 백업 가져오기</summary>
+              <p class="micro">CoreDataModel과 사진을 함께 선택하거나, 구형 앱의 ZIP·TAR·암호화되지 않은 Android 백업(.ab)을 선택하세요.</p>
+              <label class="quiet file-label">백업 파일 선택<input id="legacy-backup" type="file" multiple></label>
+              <label class="quiet file-label">백업 폴더 선택<input id="legacy-folder" type="file" webkitdirectory multiple></label>
+              <p id="legacy-result" class="micro" role="status" hidden></p>
+              <ul id="legacy-skips" class="micro" hidden></ul>
+            </details>
           </form>
         </div>
 
@@ -118,19 +131,26 @@
 
     <section class="maintenance" id="maintenance" aria-labelledby="maintenance-title">
       <div class="section-head"><h2 id="maintenance-title">기기 관리</h2></div>
-      <details>
+      <details id="device-tools">
+        <summary>저장된 기기 <span class="micro">별칭 관리와 기기 전환</span></summary>
+        <div class="maintenance-actions"><label>기기 <select id="known-devices"></select></label><button type="button" id="use-device" class="secondary" disabled>이 기기로 연결</button><button type="button" id="pick-device" class="quiet" disabled>다른 기기 선택</button></div>
+        <form class="maintenance-actions alias-form" id="alias-form"><label>기기 별칭 <input id="device-alias" maxlength="40" placeholder="선택"></label><button class="quiet" id="save-alias" type="submit" disabled>별칭 저장</button></form>
+      </details>
+      <details id="drain-tools">
         <summary>배수 <span class="micro">탱크에 남은 물 비우기</span></summary>
         <p>드리퍼를 비우고 배출구 아래에 충분한 용량의 내열 용기를 놓으세요.</p>
         <button type="button" id="drain" class="secondary" disabled>배수 시작</button>
       </details>
-      <details>
+      <details id="clean-tools">
         <summary>세척 및 헹굼 <span class="micro">세척 후 깨끗한 물로 헹구기</span></summary>
         <p>본체 설명서에 따라 세척액과 내열 용기를 준비하세요. 세척 후 대기 시간이 끝나면 깨끗한 물을 넣고 헹굼을 시작하세요.</p>
-        <div class="maintenance-actions"><button type="button" id="clean" class="secondary" disabled>세척 시작</button><button type="button" id="rinse" class="primary" hidden>깨끗한 물로 헹굼</button></div>
+        <div class="maintenance-actions"><button type="button" id="clean" class="secondary">세척 준비</button><button type="button" id="rinse" class="primary" hidden>깨끗한 물로 헹굼</button></div>
       </details>
-      <details>
+      <details id="flow-tools">
         <summary>유량 조절 <span class="micro">본체 유량 보정 단계</span></summary>
-        <div class="maintenance-actions"><label>단계 <input id="level" type="number" min="1" max="9" value="5"></label><button type="button" id="read-flow" class="quiet" disabled>읽기</button><button type="button" id="save-flow" class="secondary" disabled>적용</button></div>
+        <p><span>현재 유량 단계</span> <output id="current-flow">—</output></p>
+        <div id="flow-levels" class="flow-levels" role="group" aria-label="유량 조절"></div>
+        <button type="button" id="read-flow" class="quiet" disabled>다시 읽기</button>
       </details>
       <label class="language-setting">언어 <select id="language"><option value="ko">한국어</option><option value="ja">日本語</option><option value="en">English</option></select></label>
     </section>
@@ -173,7 +193,52 @@
 
   <dialog id="device-dialog" aria-labelledby="device-alert-title" aria-describedby="device-alert-text">
     <h2 id="device-alert-title"></h2><p id="device-alert-text"></p>
+    <div id="brew-result" hidden><img id="brew-result-photo" width="64" height="64" alt="" hidden><dl id="brew-result-values"></dl></div>
     <div class="dialog-actions"><button id="dismiss-device-alert" type="button" class="quiet" autofocus>확인</button><button id="overheat-drain" type="button" class="primary" hidden>배수</button></div>
+  </dialog>
+
+  <dialog id="water-dialog" aria-labelledby="water-title">
+    <form method="dialog">
+      <h2 id="water-title">탱크에 물이 남아 있나요?</h2><p>이전에 사용한 물이 남아 있으면 배수 화면에서 먼저 비워 주세요.</p>
+      <div class="dialog-actions"><button class="quiet" value="cancel">취소</button><button class="quiet" value="drain">배수 화면</button><button class="primary" value="ready">남은 물 없음</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="clean-guide" aria-labelledby="clean-guide-title">
+    <form method="dialog">
+      <h2 id="clean-guide-title">세척 준비</h2>
+      <div id="clean-step-one"><p>물 500mL에 구연산 10g을 녹여 탱크에 넣으세요.</p></div>
+      <div id="clean-step-two" hidden><p>종이 필터와 커피를 뺀 드리퍼를 장착하고, 배출구 아래에 충분한 용량의 내열 서버를 놓으세요.</p><p>세척액으로 추출한 물은 버리고, 5분 대기 안내가 끝나면 깨끗한 물로 헹구세요.</p></div>
+      <div class="dialog-actions"><button class="quiet" value="cancel">취소</button><button class="quiet" id="clean-guide-back" type="button" hidden>이전</button><button class="primary" id="clean-guide-next" type="button">다음</button><button class="primary" id="clean-guide-start" value="start" hidden>세척 시작</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="crop-dialog" aria-labelledby="crop-title">
+    <form method="dialog">
+      <h2 id="crop-title">사진 자르기</h2>
+      <canvas id="photo-crop" width="256" height="256" role="img" aria-label="사진 미리보기"></canvas>
+      <div class="crop-controls">
+        <label>확대 <input id="crop-zoom" type="range" min="100" max="300" value="100"></label>
+        <label>좌우 위치 <input id="crop-x" type="range" min="0" max="100" value="50"></label>
+        <label>상하 위치 <input id="crop-y" type="range" min="0" max="100" value="50"></label>
+      </div>
+      <div class="dialog-actions"><button class="quiet" value="cancel">취소</button><button class="primary" value="apply">사진 적용</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="switch-dialog" aria-labelledby="switch-title">
+    <form method="dialog"><h2 id="switch-title">다른 기기로 전환할까요?</h2><p>지금 연결을 해제하고 다른 Smart7 기기를 선택합니다.</p>
+      <div class="dialog-actions"><button class="quiet" value="cancel">취소</button><button class="primary" id="confirm-switch" type="button">기기 선택</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="overwrite-dialog" aria-labelledby="overwrite-title">
+    <form method="dialog">
+      <h2 id="overwrite-title">저장한 레시피 덮어쓰기</h2>
+      <label>바꿀 레시피 <select id="overwrite-target" required></select></label>
+      <p>선택한 레시피를 현재 설정으로 바꿉니다. 기존 사진도 삭제됩니다.</p>
+      <div class="dialog-actions"><button class="quiet" value="cancel">취소</button><button class="danger" value="overwrite">덮어쓰기</button></div>
+    </form>
   </dialog>
 </body>
 </html>

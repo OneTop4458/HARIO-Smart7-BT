@@ -3,6 +3,7 @@ import { publicRecipes } from './recipe-library.js';
 import { Smart7, workingPhases } from './protocol.js';
 import { drawBrewGraph } from './brew-graph.js';
 import { localizeStatic, setLanguage, t } from './i18n.js';
+import { drawRecipeCrop } from './recipe-photo.js';
 
 const $ = id => document.getElementById(id);
 const auto = $('auto-settings');
@@ -12,15 +13,20 @@ const pinForm = $('pin-form');
 const confirmDialog = $('confirm-dialog');
 const libraryDialog = $('recipe-library');
 const deviceDialog = $('device-dialog');
+const cropDialog = $('crop-dialog');
+const waterDialog = $('water-dialog');
+const cleanGuide = $('clean-guide');
+const switchDialog = $('switch-dialog');
+const overwriteDialog = $('overwrite-dialog');
 const translatePage = localizeStatic(document.body);
 const storageKey = 'smart7-recipes';
 let mode = 'auto';
 let selected = '';
 let lastPreview = '';
-let displayedLevel = null;
 let activeRecipe;
 let draftPhoto;
 let photoRead = 0;
+let cropBitmap;
 let graphSteps = [];
 let graphElapsed;
 let offlineMessage = '';
@@ -29,9 +35,22 @@ let actionInProgress = false;
 let wakeLock;
 let requestingWakeLock = false;
 let installPrompt;
+let waterConfirmed = false;
+let cleanStep = 1;
+let knownDevices = [];
+let previousConnection = 'disconnected';
+const cupSettings = new Map();
+let deviceAliases;
 
-try { recipes = JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch { recipes = []; }
+try {
+  const saved = localStorage.getItem(storageKey);
+  recipes = saved === null
+    ? [{ ...automaticRecipe(2, 'normal', 93), id: 'default-a', name: 'default A', grounds: 18 }]
+    : JSON.parse(saved);
+} catch { recipes = []; }
 if (!Array.isArray(recipes)) recipes = [];
+try { deviceAliases = new Map(Object.entries(JSON.parse(localStorage.getItem('smart7-aliases') || '{}'))); }
+catch { deviceAliases = new Map(); }
 
 const connectionLabels = {
   disconnected: '연결 안 됨', connecting: '연결 중', pin: 'PIN 확인', ready: 'Smart7 연결됨'
@@ -44,7 +63,8 @@ const phaseLabels = {
 const deviceAlerts = {
   busy: ['기기가 사용 중입니다', '본체에서 진행 중인 작업을 확인하세요. 확인을 누르면 요청한 작업을 취소합니다.'],
   overheat: ['탱크 수온이 너무 높습니다', '탱크의 물을 60°C 미만으로 식혀 주세요. 배수하려면 배출구 아래에 내열 용기를 놓으세요.'],
-  'rinse-complete': ['헹굼 완료', '헹굼이 완료됐습니다.']
+  'rinse-complete': ['헹굼 완료', '헹굼이 완료됐습니다.'],
+  'brew-complete': ['추출 완료', '추출이 완료됐습니다.']
 };
 const appleMobile = /iPhone|iPad|iPod/i.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -63,7 +83,8 @@ function formRecipe() {
   if (mode === 'auto') {
     const fields = new FormData(auto);
     const cups = Number(fields.get('cups'));
-    return { ...automaticRecipe(cups, fields.get('speed'), Number(fields.get('temperature'))), name: t('자동 추출 {cups}잔', { cups }) };
+    const speed = fields.get('speed');
+    return { ...automaticRecipe(cups, speed, Number(fields.get('temperature'))), speed, name: t('자동 추출 {cups}잔', { cups }) };
   }
   return {
     name: custom.elements.namedItem('name').value,
@@ -78,6 +99,10 @@ function formRecipe() {
   };
 }
 
+function formatDuration(seconds) {
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
 function renderSummary(state) {
   const recipe = activeRecipe || formRecipe();
   const steps = recipe.steps.filter(step => [step.volume, step.pour, step.wait].every(Number.isFinite)
@@ -87,7 +112,7 @@ function renderSummary(state) {
   volumeUnit.textContent = ' mL';
   $('volume').replaceChildren(totals.volume ? `${totals.volume}` : '—', volumeUnit);
   const seconds = state.seconds ?? totals.seconds;
-  $('timer').textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  $('timer').textContent = formatDuration(seconds);
   $('timer-label').textContent = t(state.seconds == null ? '예상 추출 시간' : '남은 시간');
   $('recipe-title').textContent = recipe.name || t('새 레시피');
   showPhoto($('summary-photo'), recipe.photo);
@@ -115,13 +140,37 @@ function showPhoto(image, photo) {
   else if (image.getAttribute('src') !== photo) image.src = photo;
 }
 
+function renderBrewResult(recipe) {
+  $('brew-result').hidden = !recipe;
+  if (!recipe) return;
+  showPhoto($('brew-result-photo'), recipe.photo);
+  const totals = summarize(recipe.steps);
+  const rows = [
+    ['레시피 이름', recipe.name], ['물 온도', `${recipe.temperature} °C`],
+    ['총 물량', `${totals.volume} mL`], ['예상 추출 시간', formatDuration(totals.seconds)]
+  ];
+  if (recipe.grounds != null) rows.push(['원두량 (g)', `${recipe.grounds} g`]);
+  if (recipe.speed) rows.push(['추출 속도', t(recipe.speed === 'fast' ? '빠르게' : '기본')]);
+  $('brew-result-values').replaceChildren(...rows.flatMap(([label, value]) => {
+    const term = document.createElement('dt');
+    const detail = document.createElement('dd');
+    term.textContent = t(label);
+    detail.textContent = value;
+    return [term, detail];
+  }));
+}
+
 function render(state) {
   const busy = workingPhases.includes(state.phase);
   const ready = state.connection === 'ready';
   const disconnected = state.connection === 'disconnected';
+  const connectedNow = ready && previousConnection !== 'ready';
+  previousConnection = state.connection;
   const locked = actionInProgress || busy || !!state.alert;
   if (!['starting', 'heating', 'brewing', 'paused', 'complete'].includes(state.phase)) activeRecipe = null;
-  $('connection').textContent = t(connectionLabels[state.connection]);
+  const alias = ready && deviceAliases.get(brewer.device?.id);
+  $('connection').textContent = alias ? `${t(connectionLabels[state.connection])} · ${alias}` : t(connectionLabels[state.connection]);
+  if (disconnected) waterConfirmed = false;
   $('connection-dot').className = ready ? 'ready' : disconnected ? '' : 'pending';
   $('connect').disabled = !supported || !disconnected;
   $('connect').hidden = ready;
@@ -140,13 +189,19 @@ function render(state) {
   $('pause').disabled = actionInProgress;
   $('stop').hidden = !busy || !ready;
   $('stop').disabled = false;
-  for (const id of ['drain', 'clean', 'read-flow', 'save-flow']) $(id).disabled = !ready || locked;
+  for (const id of ['drain', 'clean', 'read-flow']) $(id).disabled = !supported || locked;
   $('rinse').hidden = state.phase !== 'awaiting-rinse';
   $('rinse').disabled = actionInProgress;
-  if (state.level !== displayedLevel) {
-    displayedLevel = state.level;
-    if (state.level !== null) $('level').value = state.level;
+  $('current-flow').value = state.level ?? '—';
+  for (const button of $('flow-levels').children) {
+    const level = Number(button.value);
+    button.disabled = !supported || locked;
+    button.classList.toggle('is-filled', state.level != null && level <= state.level);
+    button.setAttribute('aria-pressed', String(state.level === level));
   }
+  renderDeviceControls(locked);
+  if (connectedNow && $('device-tools').open) void refreshKnownDevices();
+  if (connectedNow && $('flow-tools').open) queueMicrotask(() => void run(() => brewer.readFlow()));
   document.querySelector('.recipe-settings').inert = locked;
   document.querySelector('.mode').inert = locked;
   $('open-library').disabled = locked;
@@ -165,8 +220,12 @@ function render(state) {
     $('overheat-drain').hidden = !hot;
     $('overheat-drain').disabled = actionInProgress;
     $('dismiss-device-alert').disabled = actionInProgress;
+    renderBrewResult(state.alert === 'brew-complete' ? activeRecipe : null);
     if (!deviceDialog.open) deviceDialog.showModal();
-  } else if (deviceDialog.open) deviceDialog.close();
+  } else if (deviceDialog.open) {
+    renderBrewResult(null);
+    deviceDialog.close();
+  }
   renderSummary(state);
   holdScreen(busy);
 }
@@ -219,16 +278,39 @@ function refreshOptions() {
   $('saved-recipes').value = selected;
   $('delete-recipe').hidden = selected === '';
   $('copy-recipe').hidden = selected === '';
+  $('replace-auto').hidden = recipes.length === 0;
+  $('replace-recipe').hidden = !recipes.some(recipe => recipe.id !== selected);
   $('export-recipes').disabled = !recipes.length;
+  const index = recipes.findIndex(item => item.id === selected);
+  $('recipe-order').hidden = index < 0 || recipes.length < 2;
+  $('recipe-up').disabled = index <= 0;
+  $('recipe-down').disabled = index < 0 || index === recipes.length - 1;
+}
+
+function moveRecipe(offset) {
+  const index = recipes.findIndex(item => item.id === selected);
+  const target = index + offset;
+  if (index < 0 || target < 0 || target >= recipes.length) return;
+  const next = [...recipes];
+  [next[index], next[target]] = [next[target], next[index]];
+  try {
+    saveRecipes(next);
+    refreshOptions();
+  } catch (error) { brewer.update({ message: error.message }); }
 }
 
 function renumber() {
   const rows = [...$('steps').children];
   rows.forEach((row, index) => {
     row.querySelector('.number').textContent = String(index + 1).padStart(2, '0');
-    const remove = row.querySelector('button');
-    remove.disabled = rows.length === 1;
+    const [up, down, remove] = row.querySelectorAll('button');
+    up.disabled = index < 2;
+    down.disabled = index === 0 || index === rows.length - 1;
+    remove.disabled = index === 0;
+    up.setAttribute('aria-label', t('{index}단계 위로', { index: index + 1 }));
+    down.setAttribute('aria-label', t('{index}단계 아래로', { index: index + 1 }));
     remove.setAttribute('aria-label', t('{index}단계 삭제', { index: index + 1 }));
+    row.querySelector('.number').title = index === 0 ? t('뜸들이기') : '';
   });
   $('add-step').disabled = rows.length >= 11;
 }
@@ -250,10 +332,19 @@ function appendStep(step = { volume: 70, pour: 13, wait: 0 }) {
     label.append(input);
     row.append(label);
   }
-  const remove = document.createElement('button');
-  Object.assign(remove, { type: 'button', className: 'quiet', textContent: '×' });
-  remove.addEventListener('click', () => { row.remove(); renumber(); settingsChanged(); });
-  row.append(remove);
+  const controls = document.createElement('div');
+  controls.className = 'step-buttons';
+  for (const [symbol, action] of [
+    ['↑', () => row.parentNode.insertBefore(row, row.previousElementSibling)],
+    ['↓', () => row.parentNode.insertBefore(row.nextElementSibling, row)],
+    ['×', () => row.remove()]
+  ]) {
+    const button = document.createElement('button');
+    Object.assign(button, { type: 'button', className: 'quiet', textContent: symbol });
+    button.addEventListener('click', () => { action(); renumber(); settingsChanged(); });
+    controls.append(button);
+  }
+  row.append(controls);
   $('steps').append(row);
   renumber();
 }
@@ -262,6 +353,7 @@ function loadRecipe(id) {
   selected = id;
   const recipe = recipes.find(item => item.id === id) || automaticRecipe(2, 'normal', 93);
   photoRead++;
+  if (cropDialog.open) cropDialog.close('cancel');
   setDraftPhoto(recipe.photo);
   custom.elements.namedItem('name').value = id ? recipe.name : '';
   custom.elements.namedItem('temperature').value = recipe.temperature;
@@ -288,6 +380,80 @@ function saveRecipes(items) {
     throw error;
   }
   recipes = items;
+}
+
+function renderDeviceControls(locked) {
+  const id = $('known-devices').value;
+  const state = brewer.state.connection;
+  const connecting = state === 'connecting' || state === 'pin';
+  $('known-devices').disabled = !knownDevices.length || locked || connecting;
+  $('device-alias').disabled = !id || locked || connecting;
+  $('save-alias').disabled = !id || locked || connecting;
+  $('use-device').disabled = !supported || !id || locked || connecting || brewer.device?.id === id;
+  $('pick-device').disabled = !supported || locked || connecting;
+}
+
+function renderKnownDevices() {
+  const picker = $('known-devices');
+  const selection = picker.value || brewer.device?.id || localStorage.getItem('smart7-device');
+  const options = knownDevices.map(device => new Option(deviceAliases.get(device.id) || device.name || 'Smart7', device.id));
+  picker.replaceChildren(...(options.length ? options : [new Option(t('저장된 기기 없음'), '')]));
+  if (knownDevices.some(device => device.id === selection)) picker.value = selection;
+  $('device-alias').value = deviceAliases.get(picker.value) || '';
+  render(brewer.state);
+}
+
+async function refreshKnownDevices() {
+  let granted = [];
+  if (supported && navigator.bluetooth.getDevices) {
+    try { granted = await navigator.bluetooth.getDevices(); } catch { /* Connecting through the picker is still available. */ }
+  }
+  const current = brewer.device;
+  if (current && !granted.some(device => device.id === current.id)) granted.push(current);
+  knownDevices = granted.filter(device => device.name?.includes('EVS-70'));
+  renderKnownDevices();
+}
+
+function requestOperationConnection() {
+  if (brewer.state.connection === 'ready') return true;
+  if (supported && brewer.state.connection === 'disconnected') {
+    const reuse = Boolean(navigator.bluetooth.getDevices && localStorage.getItem('smart7-device'));
+    void brewer.connect(reuse);
+  }
+  return false;
+}
+
+function showDrainPreparation() {
+  waterConfirmed = false;
+  $('drain-tools').open = true;
+  $('drain-tools').scrollIntoView({ block: 'nearest' });
+  $('drain').focus();
+}
+
+async function checkTank() {
+  if (waterConfirmed) return true;
+  if (waterDialog.open || brewer.state.connection !== 'ready') return false;
+  waterDialog.returnValue = '';
+  const choice = await new Promise(resolve => {
+    waterDialog.addEventListener('close', () => resolve(waterDialog.returnValue), { once: true });
+    waterDialog.showModal();
+  });
+  if (choice === 'drain') showDrainPreparation();
+  if (choice !== 'ready') return false;
+  try {
+    await brewer.prepareBrew();
+    waterConfirmed = true;
+  } catch (error) { brewer.update({ message: error.message }); }
+  return waterConfirmed;
+}
+
+function showCleanStep(step) {
+  cleanStep = step;
+  $('clean-step-one').hidden = step !== 1;
+  $('clean-step-two').hidden = step !== 2;
+  $('clean-guide-back').hidden = step === 1;
+  $('clean-guide-next').hidden = step !== 1;
+  $('clean-guide-start').hidden = step !== 2;
 }
 
 function recipeKey(recipe) {
@@ -340,40 +506,63 @@ async function pickPhoto(event) {
   try {
     if (file.size > 20000000 || !file.type.startsWith('image/')) throw new Error('20MB 이하 이미지 파일을 선택하세요.');
     const bitmap = await createImageBitmap(file);
-    let photo;
-    try {
-      const size = Math.min(bitmap.width, bitmap.height);
-      const canvas = document.createElement('canvas');
-      canvas.width = canvas.height = 256;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, 256, 256);
-      ctx.drawImage(bitmap, (bitmap.width - size) / 2, (bitmap.height - size) / 2, size, size, 0, 0, 256, 256);
-      photo = canvas.toDataURL('image/jpeg', 0.84);
-    } finally { bitmap.close(); }
-    if (reading !== photoRead) return;
-    setDraftPhoto(photo);
-    settingsChanged();
+    if (reading !== photoRead) { bitmap.close(); return; }
+    cropBitmap?.close();
+    cropBitmap = bitmap;
+    cropDialog.querySelector('form').reset();
+    cropDialog.returnValue = '';
+    paintCrop();
+    if (!cropDialog.open) cropDialog.showModal();
   } catch (error) {
     if (reading === photoRead) brewer.update({ message: error.name === 'InvalidStateError' ? '이미지를 열 수 없습니다.' : error.message });
   }
 }
 
+function paintCrop() {
+  if (!cropBitmap) return;
+  drawRecipeCrop($('photo-crop'), cropBitmap, $('crop-zoom').valueAsNumber / 100,
+    $('crop-x').valueAsNumber / 100, $('crop-y').valueAsNumber / 100);
+}
+
 document.querySelector('.mode').addEventListener('change', event => {
+  const changed = mode !== event.target.value;
   mode = event.target.value;
   auto.hidden = mode !== 'auto';
   custom.hidden = mode !== 'custom';
   settingsChanged();
+  if (changed) waterConfirmed = false;
+  if (changed && event.isTrusted && brewer.state.connection === 'ready') void checkTank();
 });
-auto.addEventListener('change', settingsChanged);
+auto.addEventListener('change', event => {
+  const { cups, temperature, speed } = auto.elements;
+  if (event.target.name === 'cups') {
+    const preferences = cupSettings.get(cups.value);
+    temperature.value = preferences?.temperature ?? '93';
+    speed.value = preferences?.speed ?? 'normal';
+  } else {
+    cupSettings.set(cups.value, { temperature: temperature.value, speed: speed.value });
+  }
+  settingsChanged();
+});
 custom.addEventListener('input', settingsChanged);
 $('saved-recipes').addEventListener('change', event => loadRecipe(event.target.value));
 $('new-recipe').addEventListener('click', () => loadRecipe(''));
+$('recipe-up').addEventListener('click', () => moveRecipe(-1));
+$('recipe-down').addEventListener('click', () => moveRecipe(1));
 $('add-step').addEventListener('click', () => { appendStep(); settingsChanged(); });
 $('brew-details').addEventListener('toggle', repaintGraph);
 new ResizeObserver(repaintGraph).observe($('brew-graph'));
 $('recipe-photo').addEventListener('change', pickPhoto);
 $('take-photo').addEventListener('change', pickPhoto);
+cropDialog.addEventListener('input', paintCrop);
+cropDialog.addEventListener('close', () => {
+  if (cropDialog.returnValue === 'apply' && cropBitmap) {
+    setDraftPhoto($('photo-crop').toDataURL('image/jpeg', 0.84));
+    settingsChanged();
+  }
+  cropBitmap?.close();
+  cropBitmap = null;
+});
 $('remove-photo').addEventListener('click', () => { photoRead++; setDraftPhoto(undefined); settingsChanged(); });
 custom.addEventListener('submit', event => {
   event.preventDefault();
@@ -407,6 +596,27 @@ function saveCopy(fromAuto) {
 }
 $('save-auto').addEventListener('click', () => saveCopy(true));
 $('copy-recipe').addEventListener('click', () => saveCopy(false));
+function replaceRecipe(fromAuto) {
+  try {
+    const replacement = validateRecipe({ ...formRecipe(), photo: undefined });
+    const targets = fromAuto ? recipes : recipes.filter(recipe => recipe.id !== selected);
+    $('overwrite-target').replaceChildren(...targets.map(recipe => new Option(recipe.name, recipe.id)));
+    overwriteDialog.returnValue = '';
+    overwriteDialog.addEventListener('close', () => {
+      if (overwriteDialog.returnValue !== 'overwrite') return;
+      const id = $('overwrite-target').value;
+      if (!recipes.some(recipe => recipe.id === id)) return;
+      try {
+        saveRecipes(recipes.map(recipe => recipe.id === id ? { id, ...replacement } : recipe));
+        openSavedRecipe(id);
+        brewer.update({ message: '선택한 레시피에 설정을 덮어썼습니다.' });
+      } catch (error) { brewer.update({ message: error.message }); }
+    }, { once: true });
+    overwriteDialog.showModal();
+  } catch (error) { brewer.update({ message: error.message }); }
+}
+$('replace-auto').addEventListener('click', () => replaceRecipe(true));
+$('replace-recipe').addEventListener('click', () => replaceRecipe(false));
 $('delete-recipe').addEventListener('click', () => confirmAction('저장한 레시피 삭제', '이 브라우저에서 선택한 레시피를 삭제합니다.', () => {
   saveRecipes(recipes.filter(item => item.id !== selected));
   loadRecipe('');
@@ -442,6 +652,44 @@ $('import-recipes').addEventListener('change', async event => {
     brewer.update({ message: results.join(' ') || '모든 레시피가 이미 저장되어 있습니다.' });
   } catch (error) { brewer.update({ message: t('가져오기 실패. {message}', { message: t(error.message) }) }); }
 });
+
+async function importLegacy(event) {
+  const files = [...event.target.files];
+  event.target.value = '';
+  if (!files.length || $('legacy-backup').disabled) return;
+  const result = $('legacy-result');
+  const skips = $('legacy-skips');
+  $('legacy-backup').disabled = $('legacy-folder').disabled = true;
+  result.hidden = false;
+  skips.hidden = true;
+  skips.replaceChildren();
+  result.textContent = t('구형 앱 백업을 읽고 있습니다.');
+  try {
+    const { readLegacyBackup } = await import('./legacy-backup.js');
+    const { recipes: imported, missingPhotos, skipped } = await readLegacyBackup(files);
+    const { firstId, added, updated } = addRecipes(imported);
+    if (firstId && mode === 'custom' && !workingPhases.includes(brewer.state.phase)) loadRecipe(firstId);
+    const messages = [t('레시피 {count}개를 가져왔습니다.', { count: added })];
+    if (updated) messages.push(t('저장된 레시피 {count}개의 사진을 가져왔습니다.', { count: updated }));
+    const duplicates = imported.length - added - updated;
+    if (duplicates) messages.push(t('중복 {count}개는 건너뛰었습니다.', { count: duplicates }));
+    if (missingPhotos) messages.push(t('사진을 찾지 못한 레시피 {count}개는 설정만 가져왔습니다.', { count: missingPhotos }));
+    if (skipped.length) {
+      messages.push(t('값을 읽을 수 없는 레시피 {count}개는 건너뛰었습니다.', { count: skipped.length }));
+      for (const item of skipped) {
+        const li = document.createElement('li');
+        li.textContent = `${item.name || t('레시피 이름')} · ${t(item.message)}`;
+        skips.append(li);
+      }
+      skips.hidden = false;
+    }
+    result.textContent = messages.join(' ');
+  } catch (error) {
+    result.textContent = t('가져오기 실패. {message}', { message: t(error.message) });
+  } finally { $('legacy-backup').disabled = $('legacy-folder').disabled = false; }
+}
+$('legacy-backup').addEventListener('change', importLegacy);
+$('legacy-folder').addEventListener('change', importLegacy);
 
 function addPublicRecipe(recipe) {
   try {
@@ -480,6 +728,40 @@ $('open-library').addEventListener('click', () => libraryDialog.showModal());
 $('connect').addEventListener('click', () => brewer.connect());
 $('reconnect').addEventListener('click', () => brewer.connect(true));
 $('disconnect').addEventListener('click', () => brewer.disconnect());
+$('device-tools').addEventListener('toggle', () => { if ($('device-tools').open) void refreshKnownDevices(); });
+$('known-devices').addEventListener('change', event => {
+  $('device-alias').value = deviceAliases.get(event.target.value) || '';
+  render(brewer.state);
+});
+$('alias-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const id = $('known-devices').value;
+  if (!id) return;
+  const alias = $('device-alias').value.trim();
+  const next = new Map(deviceAliases);
+  if (alias) next.set(id, alias);
+  else next.delete(id);
+  try {
+    localStorage.setItem('smart7-aliases', JSON.stringify(Object.fromEntries(next)));
+    deviceAliases = next;
+    renderKnownDevices();
+  } catch (error) { brewer.update({ message: error.message }); }
+});
+$('use-device').addEventListener('click', () => {
+  const id = $('known-devices').value;
+  const connect = () => { if (brewer.device) brewer.disconnect(); return brewer.connect(true, id); };
+  if (brewer.state.connection === 'ready') confirmAction('다른 기기로 전환할까요?', '지금 연결을 해제하고 선택한 Smart7에 연결합니다.', connect);
+  else void run(connect);
+});
+$('pick-device').addEventListener('click', () => {
+  if (brewer.state.connection === 'ready') switchDialog.showModal();
+  else void brewer.connect();
+});
+$('confirm-switch').addEventListener('click', () => {
+  switchDialog.close();
+  brewer.disconnect();
+  void brewer.connect();
+});
 pinForm.addEventListener('submit', async event => {
   event.preventDefault();
   const submit = pinForm.querySelector('[type=submit]');
@@ -496,16 +778,26 @@ pinForm.addEventListener('submit', async event => {
 $('cancel-pin').addEventListener('click', () => run(() => brewer.cancelPin()));
 pinDialog.addEventListener('cancel', event => { event.preventDefault(); void run(() => brewer.cancelPin()); });
 deviceDialog.addEventListener('cancel', event => event.preventDefault());
-$('dismiss-device-alert').addEventListener('click', () => run(() => brewer.acknowledgeAlert()));
-$('overheat-drain').addEventListener('click', () => run(() => brewer.acknowledgeAlert(true)));
+$('dismiss-device-alert').addEventListener('click', () => run(async () => {
+  if (brewer.state.alert === 'busy' && brewer.alertPhase === 'calibration') $('flow-tools').open = false;
+  await brewer.acknowledgeAlert();
+}));
+$('overheat-drain').addEventListener('click', async () => {
+  let showDrain = false;
+  await run(async () => { showDrain = await brewer.acknowledgeAlert(true); });
+  if (showDrain) showDrainPreparation();
+});
 
-$('start').addEventListener('click', () => {
+$('start').addEventListener('click', async () => {
   try {
-    const recipe = validateRecipe(formRecipe());
+    const draft = formRecipe();
+    const recipe = validateRecipe(draft);
+    if (!await checkTank()) return;
     const { volume } = summarize(recipe.steps);
     const preparation = t('탱크에 신선한 물을 {volume}mL 이상 넣고, 드리퍼와 서버를 준비했는지 확인하세요.', { volume });
     confirmAction('추출을 시작할까요?', preparation, async () => {
-      activeRecipe = recipe;
+      waterConfirmed = false;
+      activeRecipe = { ...recipe, speed: draft.speed };
       await brewer.brew(recipe);
     });
   } catch (error) { brewer.update({ message: error.message }); }
@@ -519,14 +811,44 @@ $('stop').addEventListener('click', async () => {
   catch (error) { brewer.update({ message: error.message }); }
   finally { delete button.dataset.stopping; }
 });
-$('drain').addEventListener('click', () => confirmAction('배수를 시작할까요?', '배출구 아래 내열 용기를 놓고 본체 가까이에 있어 주세요.', () => brewer.drain()));
-$('clean').addEventListener('click', () => confirmAction('세척을 시작할까요?', '본체 설명서의 세척 준비를 마쳤는지 확인하세요.', () => brewer.clean()));
-$('rinse').addEventListener('click', () => confirmAction('헹굼을 시작할까요?', '탱크에 깨끗한 물을 넣고 배출구 아래 내열 용기를 놓으세요.', () => brewer.rinse()));
-$('read-flow').addEventListener('click', () => run(() => brewer.readFlow()));
-$('save-flow').addEventListener('click', () => {
-  const level = $('level').valueAsNumber;
-  return run(() => brewer.setFlow(level));
+$('drain').addEventListener('click', () => {
+  if (!requestOperationConnection()) return;
+  confirmAction('배수를 시작할까요?', '배출구 아래 내열 용기를 놓고 본체 가까이에 있어 주세요.', () => {
+    waterConfirmed = false;
+    return brewer.drain();
+  });
 });
+$('clean').addEventListener('click', () => {
+  showCleanStep(1);
+  cleanGuide.returnValue = '';
+  cleanGuide.showModal();
+});
+$('clean-guide-back').addEventListener('click', () => showCleanStep(cleanStep - 1));
+$('clean-guide-next').addEventListener('click', () => showCleanStep(cleanStep + 1));
+$('clean-guide-start').addEventListener('click', event => {
+  event.preventDefault();
+  if (!requestOperationConnection()) return;
+  cleanGuide.close('start');
+  waterConfirmed = false;
+  void run(() => brewer.clean());
+});
+$('rinse').addEventListener('click', () => confirmAction('헹굼을 시작할까요?', '탱크에 깨끗한 물을 넣고 배출구 아래 내열 용기를 놓으세요.', () => brewer.rinse()));
+$('flow-tools').addEventListener('toggle', () => {
+  const open = $('flow-tools').open;
+  brewer.showCalibration(open);
+  if (open && brewer.state.connection === 'ready' && !brewer.state.alert && !workingPhases.includes(brewer.state.phase)) {
+    void run(() => brewer.readFlow());
+  }
+});
+$('read-flow').addEventListener('click', () => {
+  if (requestOperationConnection()) void run(() => brewer.readFlow());
+});
+for (let level = 1; level <= 9; level++) {
+  const button = document.createElement('button');
+  Object.assign(button, { type: 'button', value: String(level), className: 'quiet', textContent: level });
+  button.addEventListener('click', () => { if (requestOperationConnection()) void run(() => brewer.setFlow(level)); });
+  $('flow-levels').append(button);
+}
 document.addEventListener('visibilitychange', () => void holdScreen(workingPhases.includes(brewer.state.phase)));
 
 window.addEventListener('beforeinstallprompt', event => {
@@ -561,7 +883,7 @@ function applyLanguage(value) {
   renumber();
   lastPreview = '';
   $('offline-status').textContent = t(offlineMessage);
-  render(brewer.state);
+  renderKnownDevices();
 }
 $('language').addEventListener('change', event => {
   localStorage.setItem('smart7-language', event.target.value);
