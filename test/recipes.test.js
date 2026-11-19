@@ -17,6 +17,12 @@ test('single files and old version-1 backups preserve the recipe', () => {
   assert.deepEqual(parseRecipeFile(`\uFEFF${JSON.stringify({ version: 1, recipes: [{ id: 'old-id', ...legacyBackup }, recipe] })}`), [legacyBackup, recipe]);
 });
 
+test('bean and grind notes survive recipe backups', () => {
+  const recipe = { ...fixture, beans: 'Washed Typica', grind: '20 clicks' };
+  assert.deepEqual(parseRecipeFile(JSON.stringify({ version: 1, recipes: [recipe] })), [recipe]);
+  assert.throws(() => validateRecipe({ ...recipe, grind: 'x'.repeat(31) }), /30자/);
+});
+
 test('legacy HARIO records use water, time and interval in transmitted order', () => {
   const record = {
     recipe_id: '999', user_name: 'Fixture', temperature: '91', coffee_grounds: '19', water: '270',

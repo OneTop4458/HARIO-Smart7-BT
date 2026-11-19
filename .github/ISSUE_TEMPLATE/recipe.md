@@ -13,6 +13,10 @@ labels: recipe
 
 ## 출처 / Source
 
+## 사진 / Photo
+
+<!-- Attach your photo here using GitHub. -->
+
 ## 추출 설정 / Brew settings
 
 <!-- 웹앱에서 레시피 공유를 누르면 온도와 추출 단계가 자동으로 첨부됩니다. / Use Share recipe in the app to attach the brew settings. -->

@@ -1,6 +1,6 @@
 import { automaticRecipe, parseRecipeFile, summarize, validateRecipe } from './recipes.js';
 import { recipePhoto } from './recipe-photos.js';
-import { getCommunityIssue, issueRecipe, issueTitle, issueUrl, listCommunityIssues, listIssueComments, recipeProposalUrl } from './community-recipes.js';
+import { getCommunityIssue, issueImage, issueRecipe, issueTitle, issueUrl, listCommunityIssues, listIssueComments, recipeProposalUrl } from './community-recipes.js';
 import { Smart7, workingPhases } from './protocol.js';
 import { drawBrewGraph } from './brew-graph.js';
 import { localizeStatic, setLanguage, t } from './i18n.js';
@@ -168,6 +168,8 @@ function formRecipe() {
     name: custom.elements.namedItem('name').value,
     temperature: custom.elements.namedItem('temperature').valueAsNumber,
     grounds: custom.elements.namedItem('grounds').value === '' ? undefined : custom.elements.namedItem('grounds').valueAsNumber,
+    beans: custom.elements.namedItem('beans').value,
+    grind: custom.elements.namedItem('grind').value,
     source: recipes.find(recipe => recipe.id === selected)?.source,
     photo: draftPhoto,
     steps: [...$('steps').children].map(row => {
@@ -448,6 +450,8 @@ function loadRecipe(id) {
   custom.elements.namedItem('name').value = id ? recipe.name : '';
   custom.elements.namedItem('temperature').value = recipe.temperature;
   custom.elements.namedItem('grounds').value = recipe.grounds ?? '';
+  custom.elements.namedItem('beans').value = recipe.beans ?? '';
+  custom.elements.namedItem('grind').value = recipe.grind ?? '';
   const source = $('recipe-source');
   source.hidden = !recipe.source;
   if (recipe.source) {
@@ -564,9 +568,12 @@ function addRecipes(items) {
       index = next.length;
       next.push({ id: crypto.randomUUID(), ...recipe });
       saved.set(key, index);
-    } else if (recipe.photo && !next[index].photo) {
-      next[index] = { ...next[index], photo: recipe.photo };
-      updated++;
+    } else {
+      const missing = ['photo', 'beans', 'grind'].filter(field => recipe[field] && !next[index][field]);
+      if (missing.length) {
+        next[index] = { ...next[index], ...Object.fromEntries(missing.map(field => [field, recipe[field]])) };
+        updated++;
+      }
     }
     firstId ??= next[index].id;
   }
@@ -747,7 +754,7 @@ $('import-recipes').addEventListener('change', async event => {
     const skipped = imported.length - added - updated;
     const results = [];
     if (added) results.push(t('레시피 {count}개를 가져왔습니다.', { count: added }));
-    if (updated) results.push(t('저장된 레시피 {count}개의 사진을 가져왔습니다.', { count: updated }));
+    if (updated) results.push(t('저장된 레시피 {count}개의 누락된 정보를 채웠습니다.', { count: updated }));
     if (results.length && skipped) results.push(t('중복 {count}개는 건너뛰었습니다.', { count: skipped }));
     brewer.update({ message: results.join(' ') || '모든 레시피가 이미 저장되어 있습니다.' });
   } catch (error) { brewer.update({ message: t('가져오기 실패. {message}', { message: t(error.message) }) }); }
@@ -811,16 +818,29 @@ function renderSavedCards() {
   }));
 }
 
+function usePublicCover(image, credit, photo, fallback) {
+  credit.hidden = !!photo;
+  image.referrerPolicy = 'no-referrer';
+  image.onerror = photo ? () => {
+    image.onerror = null;
+    image.src = fallback;
+    credit.hidden = false;
+  } : null;
+  image.src = photo || fallback;
+}
+
 function libraryCard(issue) {
-  const name = issueTitle(issue) || issue.title;
   const open = () => go('community/' + issue.number);
   const attachment = issueRecipe(issue);
+  const name = issueTitle(issue, attachment?.archive, document.documentElement.lang) || issue.title;
   if (attachment) {
-    const item = recipeCard({ ...attachment.recipe, name }, recipePhoto(attachment.archive?.photo).file, open);
+    const fallback = recipePhoto(attachment.archive?.photo).file;
+    const item = recipeCard({ ...attachment.recipe, name }, fallback, open);
     const credit = document.createElement('small');
     credit.className = 'card-credit';
     credit.textContent = t('참고 사진');
     item.querySelector('.card-picture').append(credit);
+    usePublicCover(item.querySelector('img'), credit, issueImage(issue), fallback);
     return item;
   }
   const item = document.createElement('li');
@@ -837,13 +857,13 @@ function libraryCard(issue) {
   return item;
 }
 
-function renderSharedDetail(recipe, archive, details) {
+function renderSharedDetail(recipe, archive, details, photo) {
   const { beans, grind, ice, grinder, description, guide } = archive ?? details ?? {};
   const { file, author, source, license, licenseUrl } = recipePhoto(archive?.photo);
   const { volume, seconds } = summarize(recipe.steps);
   const locale = document.documentElement.lang;
   const local = values => Array.isArray(values) ? values[locale === 'en' ? 1 : locale === 'ja' ? 2 : 0] : values;
-  $('shared-photo').src = file;
+  usePublicCover($('shared-photo'), $('shared-photo-caption'), photo, file);
   $('shared-photo-credit').href = source;
   $('shared-photo-credit').textContent = author;
   $('shared-photo-license').href = licenseUrl;
@@ -927,13 +947,13 @@ async function loadCommunityTopic() {
     }
     const attachment = issueRecipe(issue);
     topicRecipe = attachment?.recipe;
-    $('community-title').textContent = issueTitle(issue) || issue.title;
+    $('community-title').textContent = issueTitle(issue, attachment?.archive, document.documentElement.lang) || issue.title;
     $('topic-byline').textContent = `#${issue.number} · @${issue.user?.login ?? 'ghost'}`;
     $('topic-body').textContent = attachment?.body ?? issue.body ?? '';
     $('topic-body').hidden = !!(attachment?.archive || attachment?.details) || !$('topic-body').textContent;
     $('reply-on-github').href = issueUrl(issue.number);
     $('topic-recipe').hidden = !topicRecipe;
-    if (topicRecipe) renderSharedDetail(topicRecipe, attachment.archive, attachment.details);
+    if (topicRecipe) renderSharedDetail(topicRecipe, attachment.archive, attachment.details, issueImage(issue));
     $('topic-status').textContent = '';
     $('topic-content').hidden = false;
     if (topicRecipe) requestAnimationFrame(() => {
@@ -970,6 +990,14 @@ function selectedPostRecipe() {
 function updatePostRecipe() {
   const selectedRecipe = selectedPostRecipe();
   postForm.elements.namedItem('title').value = selectedRecipe?.name ?? '';
+  postForm.elements.namedItem('beans').value = selectedRecipe?.beans ?? '';
+  postForm.elements.namedItem('grind').value = selectedRecipe?.grind ?? '';
+  const photo = selectedRecipe?.photo;
+  const hasPhoto = typeof photo === 'string' && photo.startsWith('data:image/jpeg;base64,');
+  $('post-photo-tools').hidden = !hasPhoto;
+  showPhoto($('post-photo'), hasPhoto ? photo : undefined);
+  if (hasPhoto) $('post-photo-download').href = photo;
+  else $('post-photo-download').removeAttribute('href');
   $('publish-post').disabled = !selectedRecipe;
   $('post-attachment').hidden = !selectedRecipe;
   if (selectedRecipe) {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getCommunityIssue, isCommunityIssue, issueRecipe, listCommunityIssues, recipeProposalUrl } from '../public/community-recipes.js';
+import { getCommunityIssue, isCommunityIssue, issueImage, issueRecipe, issueTitle, listCommunityIssues, recipeProposalUrl } from '../public/community-recipes.js';
 import { automaticRecipe } from '../public/recipes.js';
 
 test('the board accepts open recipe issues and hides closed issues and pull requests', () => {
@@ -16,17 +16,22 @@ test('a composed issue carries importable brew settings and retains attribution'
   const draft = {
     ...automaticRecipe(2, 'normal', 93),
     name: '아침',
+    beans: '블렌드',
+    grind: '중간',
     photo: 'data:image/jpeg;base64,/9j/AA==',
     source: { label: 'Recipe source', url: 'https://example.org/recipe' }
   };
-  const link = new URL(recipeProposalUrl(draft, { beans: '블렌드', grind: '중간', description: '중간 분쇄로 추출' }));
+  const link = new URL(recipeProposalUrl(draft, { description: '중간 분쇄로 추출' }));
   assert.equal(link.hostname, 'github.com');
   assert.equal(link.searchParams.get('template'), 'recipe.md');
   assert.equal(link.searchParams.get('title'), '[레시피] 아침');
   const body = link.searchParams.get('body');
+  assert.match(body, /## 사진 \/ Photo/);
   assert.equal(body.includes('data:image'), false);
   const attachment = issueRecipe({ number: 42, body: body.replaceAll('\n', '\r\n') });
   assert.deepEqual(attachment.recipe.steps, draft.steps);
+  assert.equal(attachment.recipe.beans, draft.beans);
+  assert.equal(attachment.recipe.grind, draft.grind);
   assert.deepEqual(attachment.details, {
     beans: '블렌드', grind: '중간', description: '중간 분쇄로 추출', source: 'https://example.org/recipe'
   });
@@ -40,14 +45,27 @@ test('archival attribution is accepted only on moderation-labeled issues', () =>
   const draft = {
     ...automaticRecipe(2, 'normal', 93),
     source: { label: 'Original recipe', url: 'https://example.org/archive' },
-    archive: { id: 999, grind: '중간', photo: 'cup' }
+    archive: { id: 999, grind: '중간', photo: 'cup', titles: { en: 'Archived recipe', ja: '保存レシピ' } }
   };
   const body = '\x60\x60\x60json\n' + JSON.stringify(draft) + '\n\x60\x60\x60';
-  const issue = { number: 42, body, labels: [{ name: 'recipe' }] };
+  const issue = { title: '[레시피] 원본 제목', number: 42, body, labels: [{ name: 'recipe' }] };
   assert.equal(issueRecipe(issue).archive, undefined);
   const archived = issueRecipe({ ...issue, labels: [{ name: 'recipe-archive' }] });
   assert.deepEqual(archived.archive, { ...draft.archive, guide: '' });
   assert.deepEqual(archived.recipe.source, draft.source);
+  assert.equal(issueTitle(issue, archived.archive, 'ko'), '원본 제목');
+  assert.equal(issueTitle(issue, archived.archive, 'en'), 'Archived recipe');
+  assert.equal(issueTitle(issue, archived.archive, 'ja'), '保存レシピ');
+  assert.equal(issueTitle(issue, undefined, 'en'), '원본 제목');
+});
+
+test('public recipe covers accept GitHub attachments from markdown and HTML', () => {
+  const attachment = 'https://github.com/user-attachments/assets/8bef88c1-40ba-413b-8444-d018c9691787';
+  const legacy = 'https://user-images.githubusercontent.com/1234/old-photo.jpg';
+  assert.equal(issueImage({ body: '![Photo](' + attachment + ')' }), attachment);
+  assert.equal(issueImage({ body: '<img width="400" alt="Photo" src="' + legacy + '">' }), legacy);
+  assert.equal(issueImage({ body: '![Photo](https://github.com.example.org/user-attachments/assets/a-b)' }), '');
+  assert.equal(issueImage({ body: '![Photo](https://github.com/user-attachments/assets/payload.svg)' }), '');
 });
 
 test('the issue list follows pagination and excludes closed topics from direct links', async context => {

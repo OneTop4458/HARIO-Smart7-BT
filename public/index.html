@@ -83,6 +83,10 @@
               <label>원두량 (g) <input type="number" name="grounds" min="0" max="100" step="any" placeholder="선택"></label>
               <a id="recipe-source" class="micro source-link" target="_blank" rel="noopener noreferrer" hidden></a>
             </div>
+            <div class="form-row">
+              <label>원두 <input name="beans" maxlength="60" placeholder="선택"></label>
+              <label>분쇄도 <input name="grind" maxlength="30" placeholder="선택"></label>
+            </div>
             <fieldset class="recipe-photo">
               <legend>레시피 사진</legend>
               <div class="photo-tools">
@@ -187,7 +191,7 @@
           <div>
             <figure class="shared-photo">
               <img id="shared-photo" width="1080" height="720" alt="">
-              <figcaption><span>참고 사진</span> · <a id="shared-photo-credit" class="source-link" target="_blank" rel="noopener noreferrer"></a> · <a id="shared-photo-license" class="source-link" target="_blank" rel="noopener noreferrer"></a> · <span>축소본</span></figcaption>
+              <figcaption id="shared-photo-caption"><span>참고 사진</span> · <a id="shared-photo-credit" class="source-link" target="_blank" rel="noopener noreferrer"></a> · <a id="shared-photo-license" class="source-link" target="_blank" rel="noopener noreferrer"></a> · <span>축소본</span></figcaption>
             </figure>
             <p id="shared-description" hidden></p>
             <p class="micro" id="shared-grinder" hidden></p>
@@ -215,7 +219,7 @@
   </main>
 
   <footer id="footer" class="wrap footer">
-    <span>Smart7 · 0.1.0-beta.2</span>
+    <span>Smart7 · 0.1.0-beta.3</span>
     <div><a href="./EVS-70SV-BT-manual.pdf" target="_blank" rel="noopener noreferrer">본체 설명서</a><a href="https://github.com/OneTop4458/smart7-offline" rel="noopener">GitHub</a></div>
     <small lang="en">Unofficial community project for HARIO Smart7.</small>
   </footer>
@@ -236,6 +240,14 @@
       </div>
       <label>추출 메모 <textarea name="message" rows="3" maxlength="180"></textarea></label>
       <label>출처 URL <input name="source" type="url" pattern="https://.+" maxlength="250" placeholder="선택"></label>
+      <fieldset>
+        <legend>레시피 사진</legend>
+        <div class="photo-tools" id="post-photo-tools" hidden>
+          <img id="post-photo" width="48" height="48" alt="레시피 사진">
+          <a class="quiet" id="post-photo-download" download="smart7-recipe.jpg">사진 내려받기</a>
+        </div>
+        <p class="micro" id="post-photo-hint">GitHub 게시 화면의 사진 항목에 이미지를 첨부하세요.</p>
+      </fieldset>
       <p id="post-error" class="error" role="status" hidden></p>
       <div class="dialog-actions">
         <button class="quiet" type="button" id="cancel-post">취소</button>

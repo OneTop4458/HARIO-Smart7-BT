@@ -63,6 +63,15 @@ export function validateRecipe(recipe) {
     }
     validated.grounds = recipe.grounds;
   }
+  for (const [key, max, message] of [
+    ['beans', 60, '원두는 60자 이하로 입력하세요.'],
+    ['grind', 30, '분쇄도는 30자 이하로 입력하세요.']
+  ]) {
+    const value = recipe[key];
+    if (value == null) continue;
+    if (typeof value !== 'string' || value.trim().length > max) throw new Error(message);
+    if (value.trim()) validated[key] = value.trim();
+  }
   if (recipe.photo != null) {
     if (typeof recipe.photo !== 'string' || recipe.photo.length > 200000 || !/^data:image\/jpeg;base64,\/9j\/[A-Za-z0-9+/]*={0,2}$/.test(recipe.photo)) {
       throw new Error('레시피 사진은 200KB 이하의 JPEG여야 합니다.');

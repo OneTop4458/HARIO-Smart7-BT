@@ -26,13 +26,14 @@ function recipeDetails(record) {
 }
 
 export function recipeProposalUrl(recipe, fields) {
-  const { name, temperature, grounds, steps } = validateRecipe(recipe);
-  const details = recipeDetails({ ...fields, source: fields.source || recipe.source?.url });
+  const { name, temperature, grounds, steps, beans, grind } = validateRecipe(recipe);
+  const details = recipeDetails({ beans, grind, ...fields, source: fields.source || recipe.source?.url });
   const lines = [
     '## 원두 / Beans', details.beans || '—',
     '## 분쇄도 / Grind', details.grind || '—',
     '## 추출 메모 / Brew notes', details.description || '—',
     '## 출처 / Source', details.source || '—',
+    '## 사진 / Photo', '<!-- Attach a photo here using GitHub. -->',
     '## 추출 설정 / Brew settings', ['```json', JSON.stringify({ name, temperature, grounds, steps, details }), '```'].join('\n')
   ];
   const url = new URL(repository + '/issues/new');
@@ -48,8 +49,23 @@ export function isCommunityIssue(issue) {
     && (issue.title.startsWith('[레시피]') || hasLabel(issue, 'recipe'));
 }
 
-export function issueTitle(issue) {
+export function issueTitle(issue, archive, language) {
+  const localized = archive?.titles?.[language];
+  if (typeof localized === 'string' && localized.trim()) return localized.trim();
   return issue.title.replace(/^\[레시피\]\s*/, '');
+}
+
+export function issueImage(issue) {
+  const markdown = issue.body || '';
+  const images = markdown.matchAll(/!\[[^\]\r\n]*\]\(\s*<?(https:\/\/[^\s>)]+)>?|<img\b[^>]*?\bsrc\s*=\s*["'](https:\/\/[^"'\s]+)["']/gi);
+  for (const match of images) {
+    const href = safeHttps(match[1] || match[2]);
+    if (!href) continue;
+    const { origin, pathname } = new URL(href);
+    if (origin === 'https://github.com' && /^\/user-attachments\/assets\/[\da-f-]+$/i.test(pathname)) return href;
+    if (origin === 'https://user-images.githubusercontent.com' && /\.(?:png|jpe?g|webp|gif)$/i.test(pathname)) return href;
+  }
+  return '';
 }
 
 export function issueRecipe(issue) {
@@ -60,8 +76,15 @@ export function issueRecipe(issue) {
     const original = hasLabel(issue, 'recipe-archive') && Number.isSafeInteger(archive?.id)
       ? { ...archive, guide: safeHttps(archive.guide) } : undefined;
     const attribution = original && source ? source : { label: `GitHub · #${issue.number}`, url: issueUrl(issue.number) };
-    const recipe = validateRecipe({ name, temperature, grounds, steps, source: attribution });
-    return { recipe, archive: original, details: recipeDetails(details), body: issue.body.replace(match[0], '').trim() };
+    const metadata = recipeDetails(details);
+    const beans = original && Array.isArray(original.beans) ? original.beans[0] : metadata?.beans;
+    const grind = original?.grind ?? metadata?.grind;
+    const recipe = validateRecipe({
+      name, temperature, grounds, steps, source: attribution,
+      beans: typeof beans === 'string' ? beans.slice(0, 60) : undefined,
+      grind: typeof grind === 'string' ? grind.slice(0, 30) : undefined
+    });
+    return { recipe, archive: original, details: metadata, body: issue.body.replace(match[0], '').trim() };
   } catch { return null; }
 }
 
