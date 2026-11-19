@@ -303,9 +303,9 @@ export function setLanguage(value) {
   return language;
 }
 
-export function t(key, values) {
+export function t(key, values, locale = language) {
   const pair = Object.hasOwn(copy, key) ? copy[key] : undefined;
-  const text = language === 'en' ? pair?.[0] ?? key : language === 'ja' ? pair?.[1] ?? key : key;
+  const text = locale === 'en' ? pair?.[0] ?? key : locale === 'ja' ? pair?.[1] ?? key : key;
   return values ? text.replace(/\{(\w+)\}/g, (marker, name) => values[name] ?? marker) : text;
 }
 

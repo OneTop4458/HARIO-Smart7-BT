@@ -1321,12 +1321,19 @@ function reconnectSaved() {
 }
 
 if (appleMobile || !chrome || android) {
-  $('platform-title').textContent = t(appleMobile ? 'iPhone·iPad 연결 미지원' : chrome ? '블루투스 권한을 허용해 주세요' : 'Chrome에서 열어 주세요');
-  $('platform-message').textContent = t(appleMobile
+  const dialog = $('platform-dialog');
+  const preferences = navigator.languages?.length ? navigator.languages : [navigator.language];
+  const locale = preferences.map(tag => tag?.toLowerCase().split('-')[0])
+    .find(code => ['ko', 'en', 'ja'].includes(code)) ?? 'en';
+  const notice = key => t(key, undefined, locale);
+  dialog.lang = locale;
+  $('platform-title').textContent = notice(appleMobile ? 'iPhone·iPad 연결 미지원' : chrome ? '블루투스 권한을 허용해 주세요' : 'Chrome에서 열어 주세요');
+  $('platform-message').textContent = notice(appleMobile
     ? 'iPhone과 iPad에서는 Smart7 본체에 연결할 수 없습니다. Android 기기의 Chrome에서 이 주소를 다시 열어 주세요.'
     : chrome
       ? 'BT 연결을 누르고 Chrome에서 주변 기기 권한을 허용하세요. EVS-70을 고른 뒤 선택창의 페어링 또는 연결 버튼을 누르세요.'
       : 'Smart7을 연결하려면 Google Chrome에서 이 주소를 다시 열어 주세요.');
-  if (chrome) $('platform-dialog').addEventListener('close', reconnectSaved, { once: true });
-  $('platform-dialog').showModal();
+  dialog.querySelector('button').textContent = notice('확인');
+  if (chrome) dialog.addEventListener('close', reconnectSaved, { once: true });
+  dialog.showModal();
 } else reconnectSaved();
