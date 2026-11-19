@@ -153,6 +153,94 @@ test('manual connection waits for discovery and releases a late GATT link after 
   assert.equal(gatt.connected, false);
 });
 
+test('PIN timeouts retry without opening the device picker again', async context => {
+  for (const scenario of [
+    { name: 'second request on the same link', link: 1, request: 2, expected: [2] },
+    { name: 'first request on the third link', link: 3, request: 1, expected: [2, 2, 1] },
+    { name: 'no reply after three links', link: 0, request: 0, expected: [2, 2, 2] }
+  ]) {
+    await context.test(scenario.name, async child => {
+      const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+      const storageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+      const storage = new Map();
+      Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+        getItem: key => storage.get(key),
+        setItem: (key, value) => storage.set(key, value)
+      } });
+      child.after(() => {
+        Object.defineProperty(globalThis, 'navigator', navigatorDescriptor);
+        if (storageDescriptor) Object.defineProperty(globalThis, 'localStorage', storageDescriptor);
+        else delete globalThis.localStorage;
+      });
+      child.mock.timers.enable({ apis: ['setTimeout'] });
+      const advance = async ms => {
+        child.mock.timers.tick(ms);
+        await new Promise(resolve => setImmediate(resolve));
+      };
+      let selections = 0;
+      const requests = [];
+      const commands = [];
+      const notifier = Object.assign(new EventTarget(), { startNotifications: async () => {} });
+      const writer = {
+        properties: { writeWithoutResponse: true },
+        async writeValueWithoutResponse(bytes) {
+          const [{ command }] = parseFrames(bytes).frames;
+          commands.push(command);
+          if (command !== 9) return;
+          const link = requests.length;
+          requests[link - 1]++;
+          if (link === scenario.link && requests[link - 1] === scenario.request) {
+            const frame = encode(7, [49, 50, 51, 52, 53, 54], 0x31);
+            notifier.value = new DataView(frame.buffer);
+            notifier.dispatchEvent(new Event('characteristicvaluechanged'));
+          }
+        }
+      };
+      const gatt = {
+        connected: false,
+        async connect() { this.connected = true; requests.push(0); return this; },
+        async getPrimaryService() {
+          return { getCharacteristic: async id => id.startsWith('00001001') ? writer : notifier };
+        },
+        disconnect() { this.connected = false; }
+      };
+      const selection = Object.assign(new EventTarget(), { id: 'pin-retry-device', name: 'EVS-70SV-BT', gatt });
+      Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { bluetooth: {
+        async requestDevice() { selections++; return selection; }
+      } } });
+
+      const device = new Smart7(() => {});
+      const connecting = device.connect();
+      await advance(0);
+      for (let link = 0; link < 3 && !device.expectedPin; link++) {
+        await advance(1500);
+        await advance(500);
+        if (device.expectedPin) break;
+        await advance(4000);
+        if (!device.expectedPin) await advance(8000);
+      }
+      await connecting;
+      await advance(200);
+      assert.deepEqual(requests, scenario.expected);
+      assert.equal(selections, 1);
+
+      if (scenario.link) {
+        assert.equal(device.state.connection, 'pin');
+        assert.equal(commands.at(-1), 16);
+        await device.acceptPin('123456', true);
+        await advance(24000);
+        assert.equal(device.state.connection, 'ready');
+        assert.equal(commands.at(-1), 15);
+        device.disconnect();
+      } else {
+        assert.equal(device.state.connection, 'disconnected');
+        assert.match(device.state.message, /PIN 응답을 기다리다 시간이 초과/);
+      }
+      assert.deepEqual(requests, scenario.expected);
+    });
+  }
+});
+
 test('a busy brewer cancels queued preparation and waits for acknowledgement', async () => {
   const device = new Smart7(() => {});
   const writes = [];
