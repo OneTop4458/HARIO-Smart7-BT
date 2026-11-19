@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5efe5">
+  <meta name="description" content="HARIO Smart7 BT를 블루투스로 연결하고 인터넷 없이 커피를 추출하는 웹앱.">
+  <title>Smart7 Offline</title>
+  <link rel="icon" href="./icon-192.png">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <link rel="manifest" href="./app.webmanifest">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <header class="site-header wrap">
+    <a class="wordmark" href="#top"><span class="mark" aria-hidden="true"></span> Smart7 Offline</a>
+    <nav aria-label="주 메뉴"><a href="#brew">추출</a><a href="#maintenance">기기 관리</a><a href="https://github.com/OneTop4458/smart7-offline" rel="noopener">GitHub</a></nav>
+    <button id="install" class="quiet header-install" hidden>앱 설치</button>
+  </header>
+
+  <main id="top" class="wrap">
+    <section class="hero" aria-labelledby="title">
+      <div class="hero-content">
+        <p class="kicker">HARIO EVS-70SV-BT</p>
+        <h1 id="title">Smart7<br><em>Offline</em></h1>
+        <p class="hero-description">블루투스로 커피를 내리고, 레시피를 이 기기에 저장하세요.</p>
+        <div class="connection-bar">
+          <button type="button" id="connect" class="primary">Smart7 연결</button>
+          <button type="button" id="reconnect" class="quiet" hidden>다시 연결</button>
+          <button type="button" id="disconnect" class="quiet" hidden>연결 해제</button>
+          <span class="connection-label"><i id="connection-dot" aria-hidden="true"></i><span id="connection" role="status">연결 안 됨</span></span>
+        </div>
+        <p class="micro" id="compatibility">기기 선택 창에서 EVS-70을 선택하세요.</p>
+      </div>
+      <figure class="hero-image" aria-hidden="true"><img src="./coffee.webp" alt="" width="960" height="640" fetchpriority="high"></figure>
+    </section>
+
+    <section class="brew" id="brew" aria-labelledby="brew-title">
+      <div class="section-head">
+        <h2 id="brew-title">추출 설정</h2>
+        <p id="offline-status" class="micro" role="status"></p>
+      </div>
+      <div class="brew-layout">
+        <div class="recipe-settings">
+          <fieldset class="mode"><legend class="sr-only">추출 방식</legend>
+            <label><input type="radio" name="mode" value="auto" checked><span>자동 모드</span></label>
+            <label><input type="radio" name="mode" value="custom"><span>내 레시피</span></label>
+          </fieldset>
+          <form id="auto-settings" class="settings" aria-label="자동 모드 설정">
+            <fieldset class="cups"><legend>잔 수</legend>
+              <div class="segments">
+                <label><input type="radio" name="cups" value="2" checked><span>2잔</span></label>
+                <label><input type="radio" name="cups" value="3"><span>3잔</span></label>
+                <label><input type="radio" name="cups" value="4"><span>4잔</span></label>
+                <label><input type="radio" name="cups" value="5"><span>5잔</span></label>
+              </div>
+            </fieldset>
+            <div class="form-row">
+              <label>물 온도 <select name="temperature"><option value="90">90 °C</option><option value="93" selected>93 °C</option><option value="96">96 °C</option></select></label>
+              <label>추출 속도 <select name="speed"><option value="normal">기본</option><option value="fast">빠르게</option></select></label>
+            </div>
+          </form>
+
+          <form id="custom-settings" class="settings" aria-label="내 레시피 편집" hidden>
+            <div class="form-row saved-row"><label>저장한 레시피 <select id="saved-recipes"><option value="">새 레시피</option></select></label><button type="button" id="new-recipe" class="quiet">새로 만들기</button></div>
+            <div class="form-row"><label>레시피 이름 <input name="name" maxlength="60" required></label><label>물 온도 (°C) <input type="number" name="temperature" min="80" max="96" value="93" required></label></div>
+            <fieldset class="recipe-steps"><legend>추출 단계</legend>
+              <div id="steps"></div>
+              <button id="add-step" class="quiet" type="button">단계 추가</button>
+            </fieldset>
+            <div class="recipe-actions">
+              <button type="submit" class="secondary">저장</button>
+              <button type="button" class="quiet" id="export-recipes">내보내기</button>
+              <label class="quiet file-label">가져오기<input id="import-recipes" type="file" accept=".json,application/json"></label>
+              <button type="button" id="delete-recipe" class="quiet" hidden>삭제</button>
+            </div>
+          </form>
+        </div>
+
+        <aside class="summary" aria-label="추출 요약">
+          <div class="summary-top"><span id="recipe-title">자동 추출 2잔</span><span class="phase" id="phase" role="status">대기</span></div>
+          <div class="metrics">
+            <div><span>총 물량</span><strong id="volume">270<small> mL</small></strong></div>
+            <div><span id="timer-label">예상 추출 시간</span><strong id="timer">1:26</strong></div>
+          </div>
+          <details class="schedule"><summary>추출 단계 보기</summary><ol id="preview-steps"></ol></details>
+          <p id="live-temperature" class="micro" hidden></p>
+          <div class="brew-actions">
+            <button id="start" class="primary" disabled>추출 시작</button>
+            <button id="pause" class="secondary" hidden>일시 정지</button>
+            <button id="stop" class="danger" hidden>중지</button>
+          </div>
+        </aside>
+      </div>
+      <p class="notice" id="notice" role="status" aria-live="polite" hidden></p>
+    </section>
+
+    <section class="maintenance" id="maintenance" aria-labelledby="maintenance-title">
+      <div class="section-head"><h2 id="maintenance-title">기기 관리</h2></div>
+      <details>
+        <summary>배수 <span class="micro">탱크에 남은 물 비우기</span></summary>
+        <p>드리퍼를 비우고 배출구 아래에 충분한 용량의 내열 용기를 놓으세요.</p>
+        <button type="button" id="drain" class="secondary" disabled>배수 시작</button>
+      </details>
+      <details>
+        <summary>세척 및 헹굼 <span class="micro">세척 후 깨끗한 물로 헹구기</span></summary>
+        <p>본체 설명서에 따라 세척액과 내열 용기를 준비하세요. 세척 후 대기 시간이 끝나면 깨끗한 물을 넣고 헹굼을 시작하세요.</p>
+        <div class="maintenance-actions"><button type="button" id="clean" class="secondary" disabled>세척 시작</button><button type="button" id="rinse" class="primary" hidden>깨끗한 물로 헹굼</button></div>
+      </details>
+      <details>
+        <summary>유량 조절 <span class="micro">본체 유량 보정 단계</span></summary>
+        <div class="maintenance-actions"><label>단계 <input id="level" type="number" min="1" max="9" value="5"></label><button type="button" id="read-flow" class="quiet" disabled>읽기</button><button type="button" id="save-flow" class="secondary" disabled>적용</button></div>
+      </details>
+    </section>
+  </main>
+
+  <footer class="wrap footer"><span>Smart7 Offline · 커뮤니티 테스트 버전</span><a href="https://smart7.jp/pdf/EVS-70_12P_setumei_L.pdf" rel="noopener">본체 설명서</a></footer>
+
+  <dialog id="pin-dialog" aria-labelledby="pin-title">
+    <form id="pin-form">
+      <h2 id="pin-title">본체 PIN 확인</h2><p>Smart7 화면에 표시된 숫자 6자리를 입력하세요.</p>
+      <label>PIN <input name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="off" required></label>
+      <label class="check"><input name="remember" type="checkbox" checked> 이 브라우저에 PIN 저장</label>
+      <p id="pin-error" class="error" role="status" hidden></p>
+      <div class="dialog-actions"><button id="cancel-pin" type="button" class="quiet">취소</button><button class="primary" type="submit">연결 승인</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title">
+    <form method="dialog">
+      <h2 id="confirm-title"></h2><p id="confirm-text"></p>
+      <div class="dialog-actions"><button class="quiet" value="cancel">취소</button><button class="primary" value="confirm">확인</button></div>
+    </form>
+  </dialog>
+</body>
+</html>
