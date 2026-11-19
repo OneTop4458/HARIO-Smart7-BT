@@ -1293,10 +1293,19 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(error => console.warn(error));
 }
 
+const supportedLanguages = ['ko', 'en', 'ja'];
+
+function browserLanguage() {
+  const preferences = navigator.languages?.length ? navigator.languages : [navigator.language];
+  return preferences.map(tag => tag?.toLowerCase().split('-')[0])
+    .find(code => supportedLanguages.includes(code)) ?? 'en';
+}
+
 function applyLanguage(value) {
-  const language = setLanguage(value);
+  const preference = supportedLanguages.includes(value) ? value : '';
+  const language = setLanguage(preference || browserLanguage());
   document.documentElement.lang = language;
-  $('language').value = language;
+  $('language').value = preference;
   translatePage();
   renderCompatibility();
   refreshOptions();
@@ -1308,8 +1317,10 @@ function applyLanguage(value) {
   renderKnownDevices();
 }
 $('language').addEventListener('change', event => {
-  localStorage.setItem('smart7-language', event.target.value);
-  applyLanguage(event.target.value);
+  const value = event.target.value;
+  if (value) localStorage.setItem('smart7-language', value);
+  else localStorage.removeItem('smart7-language');
+  applyLanguage(value);
 });
 
 loadRecipe('');
@@ -1322,9 +1333,7 @@ function reconnectSaved() {
 
 if (appleMobile || !chrome || android) {
   const dialog = $('platform-dialog');
-  const preferences = navigator.languages?.length ? navigator.languages : [navigator.language];
-  const locale = preferences.map(tag => tag?.toLowerCase().split('-')[0])
-    .find(code => ['ko', 'en', 'ja'].includes(code)) ?? 'en';
+  const locale = browserLanguage();
   const notice = key => t(key, undefined, locale);
   dialog.lang = locale;
   $('platform-title').textContent = notice(appleMobile ? 'iPhone·iPad 연결 미지원' : chrome ? '블루투스 권한을 허용해 주세요' : 'Chrome에서 열어 주세요');
