@@ -14,7 +14,8 @@
 </head>
 <body>
   <header class="site-header wrap" id="top">
-    <a class="wordmark" href="#top"><span class="mark" aria-hidden="true"></span><span>Smart7<small>OFFLINE</small></span></a>
+    <button type="button" class="quiet back-button" id="back" aria-label="뒤로" hidden>‹</button>
+    <div class="wordmark"><span class="mark" aria-hidden="true"></span><span>Smart7<small>OFFLINE</small></span></div>
     <div class="header-actions">
       <button type="button" id="connect" class="primary" aria-label="Smart7 연결"><span class="bt-label" aria-hidden="true">BT</span> 연결</button>
       <button type="button" id="reconnect" class="quiet" hidden>다시 연결</button>
@@ -32,18 +33,28 @@
     </div>
     <p class="micro" id="compatibility">기기 선택 창에서 EVS-70을 선택하세요.</p>
 
-    <nav class="console-menu" aria-label="Smart7 메뉴">
-      <fieldset class="mode"><legend class="sr-only">추출 방식</legend>
-        <label><input type="radio" name="mode" value="auto" checked><span class="mode-label mode-auto">자동 모드</span></label>
-        <label><input type="radio" name="mode" value="custom"><span class="mode-label mode-recipes"><img src="./coffee.webp" alt="" width="56" height="56">내 레시피</span></label>
-      </fieldset>
-      <button type="button" class="mode-label mode-library" id="open-library">공개 레시피</button>
-      <a class="mode-label mode-maintenance" href="#maintenance">기기 관리</a>
-    </nav>
+    <section id="home" class="screen">
+      <div class="home-photo">
+        <img src="./coffee.webp" alt="" width="1080" height="720">
+        <p>V60 Auto Pour Over</p>
+      </div>
+      <nav class="console-menu" aria-label="Smart7 메뉴">
+        <a class="mode-label" href="#auto"><span class="menu-symbol" aria-hidden="true">◷</span><span>자동 모드</span><span aria-hidden="true">›</span></a>
+        <a class="mode-label" href="#recipes"><span class="menu-symbol" aria-hidden="true">▤</span><span>내 레시피</span><span aria-hidden="true">›</span></a>
+        <a class="mode-label" href="#library" id="open-library"><span class="menu-symbol" aria-hidden="true">▦</span><span>공개 레시피</span><span aria-hidden="true">›</span></a>
+        <a class="mode-label" href="#maintenance"><span class="menu-symbol" aria-hidden="true">⚙</span><span>기기 관리</span><span aria-hidden="true">›</span></a>
+      </nav>
+    </section>
 
-    <section class="brew" id="brew" aria-labelledby="brew-title">
+    <section id="recipes" class="screen" aria-labelledby="saved-title" hidden>
+      <div class="section-head"><h2 id="saved-title" tabindex="-1">내 레시피</h2><button id="create-recipe" class="primary" type="button">새로 만들기</button></div>
+      <p id="saved-empty" class="micro" hidden>저장한 레시피가 없습니다.</p>
+      <ul id="saved-cards" class="recipe-cards"></ul>
+    </section>
+
+    <section class="brew screen" id="brew" aria-labelledby="brew-title" hidden>
       <div class="section-head">
-        <h2 id="brew-title">추출 설정</h2>
+        <h2 id="brew-title" tabindex="-1">자동 모드</h2>
       </div>
       <div class="brew-layout">
         <div class="recipe-settings">
@@ -114,15 +125,23 @@
           <div class="brew-actions">
             <button id="start" class="primary" disabled>추출 시작</button>
             <button id="pause" class="secondary" hidden>일시 정지</button>
+            <button id="rinse" class="primary" type="button" hidden>깨끗한 물로 헹굼</button>
             <button id="stop" class="danger" hidden>중지</button>
           </div>
         </aside>
       </div>
-      <p class="notice" id="notice" role="status" aria-live="polite" hidden></p>
     </section>
 
-    <section class="maintenance" id="maintenance" aria-labelledby="maintenance-title">
-      <div class="section-head"><h2 id="maintenance-title">기기 관리</h2></div>
+    <section id="result" class="screen" aria-labelledby="result-title" hidden>
+      <div class="section-head"><h2 id="result-title" tabindex="-1"></h2></div>
+      <div class="summary">
+        <div id="brew-result" hidden><img id="brew-result-photo" width="64" height="64" alt="" hidden><dl id="brew-result-values"></dl></div>
+        <button id="finish-operation" type="button" class="primary">확인</button>
+      </div>
+    </section>
+
+    <section class="maintenance screen" id="maintenance" aria-labelledby="maintenance-title" hidden>
+      <div class="section-head"><h2 id="maintenance-title" tabindex="-1">기기 관리</h2></div>
       <details id="device-tools">
         <summary>저장된 기기 <span class="micro">별칭 관리와 기기 전환</span></summary>
         <div class="maintenance-actions"><label>기기 <select id="known-devices"></select></label><button type="button" id="use-device" class="secondary" disabled>이 기기로 연결</button><button type="button" id="pick-device" class="quiet" disabled>다른 기기 선택</button></div>
@@ -136,7 +155,7 @@
       <details id="clean-tools">
         <summary>세척 및 헹굼 <span class="micro">세척 후 깨끗한 물로 헹구기</span></summary>
         <p>본체 설명서에 따라 세척액과 내열 용기를 준비하세요. 세척 후 대기 시간이 끝나면 깨끗한 물을 넣고 헹굼을 시작하세요.</p>
-        <div class="maintenance-actions"><button type="button" id="clean" class="secondary">세척 준비</button><button type="button" id="rinse" class="primary" hidden>깨끗한 물로 헹굼</button></div>
+        <div class="maintenance-actions"><button type="button" id="clean" class="secondary">세척 준비</button></div>
       </details>
       <details id="flow-tools">
         <summary>유량 조절 <span class="micro">본체 유량 보정 단계</span></summary>
@@ -146,18 +165,38 @@
       </details>
       <label class="language-setting">언어 <select id="language"><option value="ko">한국어</option><option value="ja">日本語</option><option value="en">English</option></select></label>
     </section>
+
+    <section id="library" class="screen" aria-labelledby="library-title" hidden>
+      <div class="section-head"><h2 id="library-title" tabindex="-1">공개 레시피</h2></div>
+      <ul class="recipe-cards" id="library-list"></ul>
+    </section>
+
+    <article id="shared-detail" class="screen" aria-labelledby="shared-title" hidden>
+      <div class="section-head"><h2 id="shared-title" tabindex="-1"></h2></div>
+      <div class="shared-layout">
+        <div>
+          <figure class="shared-photo">
+            <img id="shared-photo" width="1080" height="720" alt="">
+            <figcaption><span>참고 사진</span> · <a id="shared-photo-credit" class="source-link" target="_blank" rel="noopener noreferrer"></a> · <a id="shared-photo-license" class="source-link" target="_blank" rel="noopener noreferrer"></a> · <span>축소본</span></figcaption>
+          </figure>
+          <p id="shared-description"></p>
+          <p class="micro" id="shared-grinder"></p>
+          <dl id="shared-values"></dl>
+          <p class="shared-sources"><a id="shared-source" class="source-link" target="_blank" rel="noopener noreferrer"></a><a id="shared-archive" class="source-link" href="https://web.archive.org/web/20241204085400/https://smart7.jp/tips.html" target="_blank" rel="noopener noreferrer" hidden>HARIO 공식 안내 보존본</a></p>
+          <p id="shared-source-note" class="micro">공유 사이트가 종료되어 원문 주소는 종료 안내로 연결될 수 있습니다.</p>
+          <button type="button" id="add-shared" class="primary">내 레시피로 저장</button>
+        </div>
+        <div class="summary">
+          <h3>추출 그래프</h3>
+          <canvas id="shared-graph" role="img" aria-label="레시피의 시간별 누적 물량 그래프"></canvas>
+          <ol id="shared-steps"></ol>
+        </div>
+      </div>
+    </article>
+    <p class="notice" id="notice" role="status" aria-live="polite" hidden></p>
   </main>
 
-  <footer class="wrap footer"><span>Smart7 Offline · 커뮤니티 테스트 버전</span><div><a href="https://smart7.jp/pdf/EVS-70_12P_setumei_L.pdf" rel="noopener">본체 설명서</a><a href="https://github.com/OneTop4458/smart7-offline" rel="noopener">GitHub</a></div></footer>
-
-  <dialog id="recipe-library" class="library-dialog" aria-labelledby="library-title">
-    <div class="library-heading">
-      <h2 id="library-title">공개 레시피</h2>
-      <form method="dialog"><button type="submit" class="quiet">닫기</button></form>
-    </div>
-    <p class="micro">예전 Smart7 공유 페이지의 설정값입니다. 원본 링크는 서비스 종료 안내로 연결될 수 있습니다.</p>
-    <ul class="library-list" id="library-list"></ul>
-  </dialog>
+  <footer id="footer" class="wrap footer"><span>Smart7 Offline · 커뮤니티 테스트 버전</span><div><a href="https://smart7.jp/pdf/EVS-70_12P_setumei_L.pdf" rel="noopener">본체 설명서</a><a href="https://github.com/OneTop4458/smart7-offline" rel="noopener">GitHub</a></div></footer>
 
   <dialog id="platform-dialog" aria-labelledby="platform-title" aria-describedby="platform-message">
     <form method="dialog">
@@ -185,7 +224,6 @@
 
   <dialog id="device-dialog" aria-labelledby="device-alert-title" aria-describedby="device-alert-text">
     <h2 id="device-alert-title"></h2><p id="device-alert-text"></p>
-    <div id="brew-result" hidden><img id="brew-result-photo" width="64" height="64" alt="" hidden><dl id="brew-result-values"></dl></div>
     <div class="dialog-actions"><button id="dismiss-device-alert" type="button" class="quiet" autofocus>확인</button><button id="overheat-drain" type="button" class="primary" hidden>배수</button></div>
   </dialog>
 

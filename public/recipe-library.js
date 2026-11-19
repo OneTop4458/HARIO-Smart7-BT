@@ -31,3 +31,7 @@ export const publicRecipes = [
   source: { label: `${author} · No.${id}`, url: url ?? `https://smart7.jp/detail_kr.php?recipe_no=${id}` },
   steps: pours.map(([volume, pour, wait]) => ({ volume, pour, wait }))
 }));
+
+export function publicRecipeId(recipe) {
+  return Number(new URL(recipe.source.url).searchParams.get('recipe_no'));
+}
