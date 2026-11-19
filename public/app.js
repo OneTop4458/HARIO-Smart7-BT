@@ -1,7 +1,7 @@
 import { automaticRecipe, parseRecipeFile, summarize, validateRecipe } from './recipes.js';
 import { recipePhoto } from './recipe-photos.js';
 import { getCommunityIssue, issueImage, issueRecipe, issueTitle, issueUrl, listCommunityIssues, listIssueComments, recipeProposalUrl } from './community-recipes.js';
-import { Smart7, workingPhases } from './protocol.js';
+import { isSmart7Name, Smart7, workingPhases } from './protocol.js';
 import { drawBrewGraph } from './brew-graph.js';
 import { localizeStatic, setLanguage, t } from './i18n.js';
 import { drawRecipeCrop } from './recipe-photo.js';
@@ -63,7 +63,16 @@ try { deviceAliases = new Map(Object.entries(JSON.parse(localStorage.getItem('sm
 catch { deviceAliases = new Map(); }
 
 const connectionLabels = {
-  disconnected: '연결 안 됨', connecting: '연결 중', pin: 'PIN 확인', ready: 'Smart7 연결됨'
+  disconnected: '연결 안 됨', selecting: '기기 선택 대기', connecting: '연결 중', pin: 'PIN 확인', ready: 'Smart7 연결됨'
+};
+const connectionStages = {
+  link: '본체에 블루투스 연결 중',
+  services: '본체의 블루투스 서비스 확인 중',
+  notifications: '본체 응답 알림 설정 중',
+  'request-pin': '본체에 PIN 요청 중',
+  'waiting-pin': '본체 PIN 응답 대기',
+  'display-pin': '본체에 PIN 표시 요청 중',
+  'accept-pin': '본체 PIN 인증 중'
 };
 const phaseLabels = {
   idle: '대기', starting: '명령 전송 중', heating: '가열 중', brewing: '추출 중', paused: '일시 정지',
@@ -76,9 +85,12 @@ const deviceAlerts = {
   'rinse-complete': ['헹굼 완료', '헹굼이 완료됐습니다.'],
   'brew-complete': ['추출 완료', '추출이 완료됐습니다.']
 };
-const appleMobile = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+const userAgent = navigator.userAgent;
+const appleMobile = /iPhone|iPad|iPod/i.test(userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const android = navigator.userAgentData?.platform === 'Android' || /Android/i.test(navigator.userAgent);
+const android = navigator.userAgentData?.platform === 'Android' || /Android/i.test(userAgent);
+const chrome = !/(?:SamsungBrowser|Edg(?:A|iOS)?|OPR|Opera|Whale|Vivaldi|YaBrowser|DuckDuckGo|MiuiBrowser|HuaweiBrowser|KAKAOTALK)\/|; wv\)/i.test(userAgent)
+  && (navigator.userAgentData?.brands?.some(({ brand }) => brand === 'Google Chrome') ?? /Chrome\//i.test(userAgent));
 const supported = !appleMobile && window.isSecureContext && !!navigator.bluetooth;
 const screenParents = { auto: 'home', recipes: 'home', editor: 'recipes', library: 'home', 'community-topic': 'library', maintenance: 'home' };
 const sections = [...document.querySelectorAll('.screen')];
@@ -154,6 +166,7 @@ function go(hash, replace = false) {
 function renderCompatibility() {
   let message = '기기 선택 창에서 EVS-70을 선택하세요.';
   if (appleMobile) message = 'Smart7 본체를 연결하려면 Android Chrome으로 접속해 주세요.';
+  else if (!chrome) message = 'Smart7을 연결하려면 Google Chrome에서 이 주소를 다시 열어 주세요.';
   else if (!supported) message = '블루투스 연결은 HTTPS에서 Android 또는 데스크톱 Chrome을 사용하세요.';
   else if (android) message = '권한 요청이 나오면 허용하고 기기 선택 창에서 EVS-70을 선택하세요.';
   $('compatibility').textContent = t(message);
@@ -252,7 +265,8 @@ function render(state) {
   const locked = actionInProgress || busy || !!state.alert;
   if (!['starting', 'heating', 'brewing', 'paused', 'complete'].includes(state.phase)) activeRecipe = null;
   const alias = ready && deviceAliases.get(brewer.device?.id);
-  $('connection').textContent = alias ? `${t(connectionLabels[state.connection])} · ${alias}` : t(connectionLabels[state.connection]);
+  const connection = t(connectionStages[state.connectionStage] ?? connectionLabels[state.connection]);
+  $('connection').textContent = alias ? `${connection} · ${alias}` : connection;
   if (disconnected) waterConfirmed = false;
   $('connection-dot').className = ready ? 'ready' : disconnected ? '' : 'pending';
   $('connect').disabled = !supported || !disconnected;
@@ -481,7 +495,7 @@ function saveRecipes(items) {
 function renderDeviceControls(locked) {
   const id = $('known-devices').value;
   const state = brewer.state.connection;
-  const connecting = state === 'connecting' || state === 'pin';
+  const connecting = state === 'selecting' || state === 'connecting' || state === 'pin';
   $('known-devices').disabled = !knownDevices.length || locked || connecting;
   $('device-alias').disabled = !id || locked || connecting;
   $('save-alias').disabled = !id || locked || connecting;
@@ -506,7 +520,7 @@ async function refreshKnownDevices() {
   }
   const current = brewer.device;
   if (current && !granted.some(device => device.id === current.id)) granted.push(current);
-  knownDevices = granted.filter(device => device.name?.includes('EVS-70'));
+  knownDevices = granted.filter(device => isSmart7Name(device.name));
   renderKnownDevices();
 }
 
@@ -1306,11 +1320,13 @@ function reconnectSaved() {
   if (supported && navigator.bluetooth.getDevices && localStorage.getItem('smart7-device')) void brewer.connect(true);
 }
 
-if (appleMobile || android) {
-  $('platform-title').textContent = t(appleMobile ? 'iPhone·iPad 연결 미지원' : '블루투스 권한을 허용해 주세요');
+if (appleMobile || !chrome || android) {
+  $('platform-title').textContent = t(appleMobile ? 'iPhone·iPad 연결 미지원' : chrome ? '블루투스 권한을 허용해 주세요' : 'Chrome에서 열어 주세요');
   $('platform-message').textContent = t(appleMobile
     ? 'iPhone과 iPad에서는 Smart7 본체에 연결할 수 없습니다. Android 기기의 Chrome에서 이 주소를 다시 열어 주세요.'
-    : 'Android Chrome에서 블루투스를 켠 뒤 BT 연결을 눌러 주세요. 블루투스 또는 주변 기기 권한을 묻는 창이 나오면 허용해 주세요.');
-  $('platform-dialog').addEventListener('close', reconnectSaved, { once: true });
+    : chrome
+      ? 'BT 연결을 누르고 Chrome에서 주변 기기 권한을 허용하세요. EVS-70을 고른 뒤 선택창의 페어링 또는 연결 버튼을 누르세요.'
+      : 'Smart7을 연결하려면 Google Chrome에서 이 주소를 다시 열어 주세요.');
+  if (chrome) $('platform-dialog').addEventListener('close', reconnectSaved, { once: true });
   $('platform-dialog').showModal();
 } else reconnectSaved();

@@ -41,7 +41,7 @@ test('mock GATT pairing and brew do not need network responses', async () => {
   const data = new Map();
   globalThis.localStorage = { getItem: key => data.get(key), setItem: (key, value) => data.set(key, value) };
   Object.assign(connection, {
-    id: 'test-device', name: 'EVS-70SV-BT', gatt: {
+    id: 'test-device', name: 'evs70', gatt: {
       connected: false,
       async connect() { this.connected = true; return this; },
       async getPrimaryService(uuid) {
@@ -52,11 +52,17 @@ test('mock GATT pairing and brew do not need network responses', async () => {
     }
   });
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { bluetooth: {
-    async requestDevice(options) { assert.deepEqual(options.optionalServices, [SERVICE]); return connection; }
+    async requestDevice(options) {
+      assert.deepEqual(options, { acceptAllDevices: true, optionalServices: [SERVICE] });
+      assert.equal(writes.length, 0);
+      return connection;
+    }
   } } });
 
-  const device = new Smart7(() => {});
+  const states = [];
+  const device = new Smart7(state => states.push(state.connectionStage ?? state.connection));
   await device.connect();
+  assert.deepEqual(states, ['selecting', 'link', 'services', 'notifications', 'request-pin', 'waiting-pin']);
   await device.handleFrame({ command: 7, data: [0x31, 0x32, 0x33, 0x34, 0x35, 0x36] });
   assert.equal(device.state.connection, 'pin');
   await assert.rejects(device.acceptPin('654321', true), /일치하지 않습니다/);
@@ -75,6 +81,76 @@ test('mock GATT pairing and brew do not need network responses', async () => {
   await device.stop();
   assert.deepEqual(writes.at(-1), { command: 2, data: [3] });
   device.disconnect();
+});
+
+test('connection guidance distinguishes an empty selection, blocked access and a missing GATT service', async context => {
+  const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  context.after(() => Object.defineProperty(globalThis, 'navigator', navigatorDescriptor));
+  const device = new Smart7(() => {});
+  const bluetooth = {
+    async requestDevice() { throw new DOMException('No device selected', 'NotFoundError'); }
+  };
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { bluetooth } });
+
+  await device.connect();
+  assert.equal(device.state.connection, 'disconnected');
+  assert.match(device.state.message, /선택된 기기가 없습니다/);
+
+  bluetooth.requestDevice = async () => { throw new DOMException('Permission denied', 'SecurityError'); };
+  await device.connect();
+  assert.match(device.state.message, /앱 권한을 확인/);
+
+  const selection = Object.assign(new EventTarget(), {
+    name: 'EVS-70SV-BT',
+    gatt: {
+      connected: false,
+      async connect() { this.connected = true; return this; },
+      async getPrimaryService() { throw new DOMException('No GATT service', 'NotFoundError'); },
+      disconnect() { this.connected = false; }
+    }
+  });
+  bluetooth.requestDevice = async () => selection;
+  await device.connect();
+  assert.match(device.state.message, /Smart7 블루투스 서비스를 찾지 못했습니다/);
+  assert.equal(selection.gatt.connected, false);
+});
+
+test('manual connection waits for discovery and releases a late GATT link after timeout', async context => {
+  const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  context.after(() => Object.defineProperty(globalThis, 'navigator', navigatorDescriptor));
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  let attempts = 0;
+  let finish;
+  const gatt = {
+    connected: false,
+    connect() {
+      attempts++;
+      return new Promise(resolve => { finish = resolve; });
+    },
+    disconnect() { this.connected = false; }
+  };
+  const selection = Object.assign(new EventTarget(), { name: 'EVS-70SV-BT', gatt });
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { bluetooth: {
+    async requestDevice() { return selection; }
+  } } });
+  const device = new Smart7(() => {});
+  const connection = device.connect();
+  await Promise.resolve();
+  context.mock.timers.tick(1499);
+  await Promise.resolve();
+  assert.equal(attempts, 0);
+  context.mock.timers.tick(1);
+  await Promise.resolve();
+  assert.equal(attempts, 1);
+
+  context.mock.timers.tick(13500);
+  await connection;
+  assert.equal(device.state.connection, 'disconnected');
+  assert.match(device.state.message, /본체에 블루투스로 연결하지 못했습니다/);
+  gatt.connected = true;
+  finish(gatt);
+  await Promise.resolve();
+  assert.equal(gatt.connected, false);
 });
 
 test('a busy brewer cancels queued preparation and waits for acknowledgement', async () => {

@@ -6,6 +6,10 @@ const WRITE = uuid('1001');
 const NOTIFY = uuid('1002');
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+export function isSmart7Name(name) {
+  return /EVS[\s-]*70(?!\d)/i.test(name ?? '');
+}
+
 export function encode(command, payload = [], key = crypto.getRandomValues(new Uint8Array(1))[0]) {
   const sum = payload.reduce((total, byte) => total + byte, command + payload.length) & 255;
   const raw = [0x99, command, payload.length, ...payload, sum];
@@ -40,6 +44,15 @@ export function parseFrames(bytes) {
 
 export const workingPhases = ['starting', 'heating', 'brewing', 'paused', 'draining', 'checking-clean', 'cleaning', 'soaking', 'awaiting-rinse', 'rinsing'];
 const brewPhases = ['starting', 'heating', 'brewing', 'paused'];
+const connectionFailures = {
+  link: '본체에 블루투스로 연결하지 못했습니다. 공식 앱의 연결을 해제한 뒤 다시 시도하세요.',
+  services: '선택한 기기의 Smart7 블루투스 서비스를 찾지 못했습니다.',
+  notifications: '본체의 PIN 알림을 설정하지 못했습니다.',
+  'request-pin': '본체에 PIN을 요청하지 못했습니다.',
+  'waiting-pin': '본체의 PIN 응답을 기다리다 시간이 초과됐습니다.',
+  'display-pin': '본체에 PIN 표시 명령을 보내지 못했습니다.',
+  'accept-pin': '본체에 PIN 인증 명령을 보내지 못했습니다.'
+};
 const deviceErrors = {
   1: '본체 센서 오류가 감지됐습니다.', 2: '물이 부족합니다.', 3: '온수 오류가 감지됐습니다.',
   4: '본체가 추출 설정을 거부했습니다.', 5: '본체가 명령을 거부했습니다.'
@@ -48,7 +61,7 @@ const deviceErrors = {
 export class Smart7 {
   constructor(onChange) {
     this.onChange = onChange;
-    this.state = { connection: 'disconnected', phase: 'idle', alert: null, message: '', temperature: null, seconds: null, level: null };
+    this.state = { connection: 'disconnected', connectionStage: null, phase: 'idle', alert: null, message: '', temperature: null, seconds: null, level: null };
     this.stageTimer = null;
     this.calibrating = false;
     this.calibrationAlerted = false;
@@ -56,7 +69,9 @@ export class Smart7 {
     this.queue = Promise.resolve();
     this.operation = 0;
     this.receive = event => this.receiveBytes(new Uint8Array(event.target.value.buffer, event.target.value.byteOffset, event.target.value.byteLength));
-    this.lost = () => this.reset('블루투스 연결이 끊겼습니다. 본체에서 상태를 확인하세요.');
+    this.lost = () => this.reset(this.state.connection === 'connecting'
+      ? connectionFailures[this.state.connectionStage] ?? '블루투스 연결이 끊겼습니다. 본체에서 상태를 확인하세요.'
+      : '블루투스 연결이 끊겼습니다. 본체에서 상태를 확인하세요.');
   }
 
   update(values) {
@@ -66,7 +81,10 @@ export class Smart7 {
 
   async connect(reuse = false, savedId) {
     if (this.state.connection !== 'disconnected') return;
-    this.update({ connection: 'connecting', message: '', phase: 'idle' });
+    const attempt = this.operation;
+    const active = () => this.operation === attempt;
+    let setupTimer;
+    this.update({ connection: reuse ? 'connecting' : 'selecting', connectionStage: null, message: '', phase: 'idle' });
     try {
       const bluetooth = navigator.bluetooth;
       if (!bluetooth) throw new Error('이 브라우저에서 Web Bluetooth를 사용할 수 없습니다.');
@@ -74,24 +92,61 @@ export class Smart7 {
         ? (await bluetooth.getDevices()).find(item => item.id === (savedId ?? localStorage.getItem('smart7-device')))
         : await bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: [SERVICE] });
       if (!device) throw new Error('저장된 기기를 찾지 못했습니다. 기기 연결에서 다시 선택하세요.');
-      if (!device.name?.includes('EVS-70')) throw new Error('목록에서 이름에 EVS-70이 포함된 Smart7 BT를 선택하세요.');
+      if (!isSmart7Name(device.name)) throw new Error('목록에서 이름에 EVS-70이 포함된 Smart7 BT를 선택하세요.');
+      if (!active()) return;
       this.device = device;
+      this.update({ connection: 'connecting', connectionStage: 'link' });
       device.addEventListener('gattserverdisconnected', this.lost);
-      const gatt = await device.gatt.connect();
-      const service = await gatt.getPrimaryService(SERVICE);
-      this.writer = await service.getCharacteristic(WRITE);
-      this.notifier = await service.getCharacteristic(NOTIFY);
-      this.notifier.addEventListener('characteristicvaluechanged', this.receive);
-      await this.notifier.startNotifications();
-      await wait(500);
-      await this.send(9);
-      if (this.state.connection === 'connecting') {
+      const setup = async () => {
+        // Give discovery time to stop, matching manual selection in the native app.
+        if (!reuse) await wait(1500);
+        if (!active()) return;
+        const gatt = await device.gatt.connect();
+        if (!active()) {
+          if (this.device !== device && gatt.connected) gatt.disconnect();
+          return;
+        }
+        this.update({ connectionStage: 'services' });
+        const service = await gatt.getPrimaryService(SERVICE);
+        if (!active()) return;
+        const writer = await service.getCharacteristic(WRITE);
+        if (!active()) return;
+        const notifier = await service.getCharacteristic(NOTIFY);
+        if (!active()) return;
+        this.writer = writer;
+        this.notifier = notifier;
+        this.update({ connectionStage: 'notifications' });
+        notifier.addEventListener('characteristicvaluechanged', this.receive);
+        await notifier.startNotifications();
+        if (!active()) return;
+        this.update({ connectionStage: 'request-pin' });
+        await wait(500);
+        if (active()) await this.send(9);
+      };
+      await Promise.race([setup(), new Promise((_, reject) => {
+        setupTimer = setTimeout(() => reject(new Error('Bluetooth setup timed out')), 15000);
+      })]);
+      if (active() && this.state.connection === 'connecting') {
+        if (!this.expectedPin) this.update({ connectionStage: 'waiting-pin' });
         this.pinTimer = setTimeout(() => {
-          this.disconnect('본체의 PIN 응답을 기다리다 시간이 초과됐습니다.');
+          this.disconnect(connectionFailures[this.state.connectionStage]);
         }, 12000);
       }
     } catch (error) {
-      this.disconnect(error.name === 'NotFoundError' ? '기기 선택이 취소됐습니다.' : error.message);
+      if (!active()) return;
+      let message = error.message;
+      if (this.state.connection === 'selecting') {
+        if (error.name === 'NotFoundError') {
+          message = '선택된 기기가 없습니다. Smart7이 보이지 않으면 공식 앱의 연결을 해제하고 Chrome의 주변 기기 권한을 확인하세요.';
+        } else if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
+          message = 'Chrome의 사이트 블루투스 설정과 휴대폰의 Chrome 앱 권한을 확인한 뒤 BT 연결을 다시 누르세요.';
+        }
+      } else {
+        message = connectionFailures[this.state.connectionStage] ?? message;
+      }
+      this.disconnect(message);
+    } finally {
+      clearTimeout(setupTimer);
     }
   }
 
@@ -104,7 +159,7 @@ export class Smart7 {
     this.pending = new Uint8Array();
     this.operation++;
     this.calibrationAlerted = false;
-    this.update({ connection: 'disconnected', phase: 'idle', alert: null, message, temperature: null, seconds: null, level: null });
+    this.update({ connection: 'disconnected', connectionStage: null, phase: 'idle', alert: null, message, temperature: null, seconds: null, level: null });
   }
 
   disconnect(message = '') {
@@ -142,16 +197,27 @@ export class Smart7 {
       if (this.writer) await this.send(18);
       return;
     }
-    if (command === 7 && this.state.connection === 'connecting' && data.length >= 6) {
-      clearTimeout(this.pinTimer);
+    if (command === 7 && this.state.connection === 'connecting' && data.length >= 6 && !this.expectedPin) {
       const digits = data.slice(0, 6).map(byte => byte & 15);
       if (digits.some(digit => digit > 9)) throw new Error('본체에서 지원되지 않는 PIN 형식이 도착했습니다.');
+      const attempt = this.operation;
       this.expectedPin = digits.join('');
       const saved = localStorage.getItem(`smart7-pin-${this.device.id}`);
-      if (saved === this.expectedPin) await this.acceptPin(saved, true);
-      else {
-        this.update({ connection: 'pin', message: '' });
-        await this.send(16);
+      try {
+        if (saved === this.expectedPin) {
+          this.update({ connectionStage: 'accept-pin' });
+          await this.acceptPin(saved, true);
+        } else {
+          this.update({ connectionStage: 'display-pin' });
+          await wait(200);
+          if (attempt !== this.operation) return;
+          await this.send(16);
+          if (attempt !== this.operation) return;
+          clearTimeout(this.pinTimer);
+          this.update({ connection: 'pin', connectionStage: null, message: '' });
+        }
+      } catch {
+        if (attempt === this.operation) this.disconnect(connectionFailures[this.state.connectionStage]);
       }
       return;
     }
@@ -231,8 +297,9 @@ export class Smart7 {
     localStorage.setItem('smart7-device', id);
     if (remember) localStorage.setItem(`smart7-pin-${id}`, input);
     else localStorage.removeItem(`smart7-pin-${id}`);
+    clearTimeout(this.pinTimer);
     this.expectedPin = null;
-    this.update({ connection: 'ready', message: '' });
+    this.update({ connection: 'ready', connectionStage: null, message: '' });
   }
 
   async cancelPin() {
