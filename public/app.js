@@ -653,44 +653,6 @@ $('import-recipes').addEventListener('change', async event => {
   } catch (error) { brewer.update({ message: t('가져오기 실패. {message}', { message: t(error.message) }) }); }
 });
 
-async function importLegacy(event) {
-  const files = [...event.target.files];
-  event.target.value = '';
-  if (!files.length || $('legacy-backup').disabled) return;
-  const result = $('legacy-result');
-  const skips = $('legacy-skips');
-  $('legacy-backup').disabled = $('legacy-folder').disabled = true;
-  result.hidden = false;
-  skips.hidden = true;
-  skips.replaceChildren();
-  result.textContent = t('구형 앱 백업을 읽고 있습니다.');
-  try {
-    const { readLegacyBackup } = await import('./legacy-backup.js');
-    const { recipes: imported, missingPhotos, skipped } = await readLegacyBackup(files);
-    const { firstId, added, updated } = addRecipes(imported);
-    if (firstId && mode === 'custom' && !workingPhases.includes(brewer.state.phase)) loadRecipe(firstId);
-    const messages = [t('레시피 {count}개를 가져왔습니다.', { count: added })];
-    if (updated) messages.push(t('저장된 레시피 {count}개의 사진을 가져왔습니다.', { count: updated }));
-    const duplicates = imported.length - added - updated;
-    if (duplicates) messages.push(t('중복 {count}개는 건너뛰었습니다.', { count: duplicates }));
-    if (missingPhotos) messages.push(t('사진을 찾지 못한 레시피 {count}개는 설정만 가져왔습니다.', { count: missingPhotos }));
-    if (skipped.length) {
-      messages.push(t('값을 읽을 수 없는 레시피 {count}개는 건너뛰었습니다.', { count: skipped.length }));
-      for (const item of skipped) {
-        const li = document.createElement('li');
-        li.textContent = `${item.name || t('레시피 이름')} · ${t(item.message)}`;
-        skips.append(li);
-      }
-      skips.hidden = false;
-    }
-    result.textContent = messages.join(' ');
-  } catch (error) {
-    result.textContent = t('가져오기 실패. {message}', { message: t(error.message) });
-  } finally { $('legacy-backup').disabled = $('legacy-folder').disabled = false; }
-}
-$('legacy-backup').addEventListener('change', importLegacy);
-$('legacy-folder').addEventListener('change', importLegacy);
-
 function addPublicRecipe(recipe) {
   try {
     const { firstId, added } = addRecipes([validateRecipe(recipe)]);

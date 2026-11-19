@@ -19,12 +19,6 @@ HARIO V60 Auto Pour Over Smart7 BT (`EVS-70SV-BT`)용 커뮤니티 웹앱입니�
 - APK 1.0.6에서 관찰한 BLE 통신을 기준으로 구현했습니다. 가상 GATT와 앱 흐름 테스트를 제공하며 실제 본체에서의 동작은 확인이 필요합니다.
 - [HARIO 서비스 종료 공지](https://shop.hario.co.jp/smart7.html) · [Smart7 본체 설명서](https://smart7.jp/pdf/EVS-70_12P_setumei_L.pdf)
 
-## 구형 Android 앱 백업 가져오기
-
-**내 레시피 → 구형 앱 백업 가져오기**에서 확보한 파일을 선택합니다. `CoreDataModel` SQLite 파일과 사진을 같은 폴더로 복사해 함께 선택하거나, 원래 파일 구조가 들어 있는 폴더, ZIP, TAR, TAR.GZ 또는 암호화되지 않은 Android `.ab` 백업을 선택할 수 있습니다. `CoreDataModel-wal`을 함께 제공하면 검증된 커밋까지 반영합니다.
-
-브라우저에서 레시피의 이름·온도·원두량·붓기 단계와 함께 있는 사진을 읽습니다. 사진이 없으면 설정만 저장합니다. 잘못된 값은 건너뛰고 이유를 표시합니다. 구형 안드로이드 앱 영역에서는 사용자가 별도로 추출한 파일이 필요하며, 암호화된 `.ab`는 지원하지 않습니다. [Android 앱 전용 저장소](https://developer.android.com/training/data-storage/app-specific)
-
 ## 개발
 
 ```sh
@@ -40,6 +34,5 @@ Vercel 프로젝트는 GitHub 저장소에 연결돼 있습니다. `main` 브랜
 - `public/recipes.js`는 자동 레시피와 입력 한도를 정의합니다.
 - `public/recipe-library.js`는 확인한 공개 레시피의 설정값과 개별 출처를 담습니다.
 - `public/sw.js`는 오프라인 사용에 필요한 앱 파일을 캐시합니다.
-- 구형 백업을 읽는 데 [sql.js 1.16.0](https://github.com/sql-js/sql.js)과 [fflate 0.8.3](https://github.com/101arrowz/fflate)을 사용합니다. `public/vendor/`에 런타임 파일과 라이선스를 포함합니다.
 
 독립 프로젝트이며 HARIO가 운영하거나 보증하는 서비스가 아닙니다. 웹앱은 새 UI와 코드를 사용하며 원본 APK를 재배포하지 않습니다. 커피 사진은 ImageGen으로 생성했습니다.
