@@ -32,14 +32,12 @@ button:disabled { opacity: .55; cursor: default; }
 .site-header { min-height: 70px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 1; background: #28333d; }
 .site-header .back-button { min-width: 42px; padding: 0; line-height: 1; font-size: 1.76rem; }
 .wordmark { font-family: system-ui, sans-serif; font-weight: 720; font-size: 1.66rem; letter-spacing: -.06em; display: flex; gap: 10px; align-items: center; margin-right: auto; }
-.wordmark small { display: inline-block; margin-left: 8px; color: var(--muted); font-size: .68rem; letter-spacing: .12em; vertical-align: middle; }
 .mark { width: 20px; height: 20px; display: inline-block; border: 1px solid var(--accent); border-radius: 50%; position: relative; }
 .mark::after { content: ''; position: absolute; height: 1px; top: 50%; inset-inline: 3px; background: var(--accent); transform: rotate(-36deg); }
 .header-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
 .bt-label { font-family: ui-monospace, monospace; letter-spacing: -.02em; margin-right: 5px; }
 .device-strip { display: flex; align-items: baseline; gap: 12px; padding: 17px 0 0; font-size: .85rem; }
 .model { font-family: ui-monospace, monospace; color: var(--muted); font-size: .82rem; letter-spacing: .05em; }
-.device-strip #offline-status { margin-left: auto; }
 .connection-label { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: .85rem; }
 .connection-label span { overflow-wrap: anywhere; }
 #connection-dot { width: 7px; height: 7px; border-radius: 50%; background: #8793a3; }
@@ -204,11 +202,9 @@ dialog .check { display: flex; align-items: center; gap: 8px; margin-top: 10px; 
 @media (max-width: 595px) {
   .site-header { min-height: 55px; flex-wrap: wrap; padding-block: 7px; }
   .wordmark { font-size: 1.28rem; gap: 7px; }
-  .wordmark small { font-size: .55rem; margin-left: 5px; }
   .mark { width: 16px; height: 16px; }
   .header-actions .primary, .header-actions .quiet { min-height: 36px; padding: 6px 9px; font-size: .8rem; }
   .device-strip { gap: 9px; padding-top: 12px; }
-  .device-strip .micro { font-size: .73rem; }
   .model { font-size: .75rem; }
   .connection-label { font-size: .75rem; }
   #home, .brew-layout, .shared-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }

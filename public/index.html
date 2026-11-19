@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#20262d">
-  <meta name="description" content="HARIO Smart7 BT를 블루투스로 연결하고 인터넷 없이 커피를 추출하는 웹앱.">
-  <title>Smart7 Offline</title>
+  <meta name="description" content="HARIO Smart7 BT를 블루투스로 연결해 추출을 제어하는 웹앱.">
+  <title>스마트 세븐</title>
   <link rel="icon" href="./icon-192.png">
   <link rel="apple-touch-icon" href="./icon-192.png">
   <link rel="manifest" href="./app.webmanifest">
@@ -15,7 +15,7 @@
 <body>
   <header class="site-header wrap" id="top">
     <button type="button" class="quiet back-button" id="back" aria-label="뒤로" hidden>‹</button>
-    <div class="wordmark"><span class="mark" aria-hidden="true"></span><span>Smart7<small>OFFLINE</small></span></div>
+    <div class="wordmark"><span class="mark" aria-hidden="true"></span><span>스마트 세븐</span></div>
     <div class="header-actions">
       <button type="button" id="connect" class="primary" aria-label="Smart7 연결"><span class="bt-label" aria-hidden="true">BT</span> 연결</button>
       <button type="button" id="reconnect" class="quiet" hidden>다시 연결</button>
@@ -25,11 +25,10 @@
   </header>
 
   <main class="wrap">
-    <h1 class="sr-only">Smart7 Offline</h1>
+    <h1 class="sr-only">스마트 세븐</h1>
     <div class="device-strip">
       <span class="model">EVS-70SV-BT</span>
       <span class="connection-label"><i id="connection-dot" aria-hidden="true"></i><span id="connection" role="status">연결 안 됨</span></span>
-      <span id="offline-status" class="micro" role="status"></span>
     </div>
     <p class="micro" id="compatibility">기기 선택 창에서 EVS-70을 선택하세요.</p>
 
@@ -197,7 +196,7 @@
     <p class="notice" id="notice" role="status" aria-live="polite" hidden></p>
   </main>
 
-  <footer id="footer" class="wrap footer"><span>Smart7 Offline · 커뮤니티 테스트 버전</span><div><a href="./EVS-70SV-BT-manual.pdf" target="_blank" rel="noopener noreferrer">본체 설명서</a><a href="https://github.com/OneTop4458/smart7-offline" rel="noopener">GitHub</a></div></footer>
+  <footer id="footer" class="wrap footer"><span>스마트 세븐 · 베타 0.0.1</span><div><a href="./EVS-70SV-BT-manual.pdf" target="_blank" rel="noopener noreferrer">본체 설명서</a><a href="https://github.com/OneTop4458/smart7-offline" rel="noopener">GitHub</a></div></footer>
 
   <dialog id="platform-dialog" aria-labelledby="platform-title" aria-describedby="platform-message">
     <form method="dialog">

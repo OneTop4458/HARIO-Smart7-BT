@@ -33,7 +33,6 @@ let photoRead = 0;
 let cropBitmap;
 let graphSteps = [];
 let graphElapsed;
-let offlineMessage = '';
 let recipes = [];
 let actionInProgress = false;
 let wakeLock;
@@ -1010,15 +1009,13 @@ $('install').addEventListener('click', async () => {
   $('install').hidden = true;
 });
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js')
-    .then(() => navigator.serviceWorker.ready)
-    .then(() => { offlineMessage = '오프라인 사용 가능'; $('offline-status').textContent = t(offlineMessage); })
-    .catch(() => { offlineMessage = '오프라인 저장을 완료하지 못했습니다.'; $('offline-status').textContent = t(offlineMessage); });
+  navigator.serviceWorker.register('./sw.js').catch(error => console.warn(error));
 }
 
 function applyLanguage(value) {
   const language = setLanguage(value);
   document.documentElement.lang = language;
+  document.title = t('스마트 세븐');
   $('language').value = language;
   translatePage();
   renderCompatibility();
@@ -1029,7 +1026,6 @@ function applyLanguage(value) {
   }
   renumber();
   lastPreview = '';
-  $('offline-status').textContent = t(offlineMessage);
   renderKnownDevices();
 }
 $('language').addEventListener('change', event => {

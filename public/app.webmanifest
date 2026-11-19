@@ -1,8 +1,10 @@
 {
   "id": "./",
-  "name": "Smart7 Offline",
+  "name": "Smart7",
   "short_name": "Smart7",
-  "description": "HARIO Smart7 BT용 오프라인 블루투스 컨트롤러",
+  "name_localized": { "ko": "스마트 세븐" },
+  "short_name_localized": { "ko": "스마트 세븐" },
+  "description": "HARIO Smart7 BT용 블루투스 컨트롤러",
   "lang": "ko",
   "start_url": "./",
   "scope": "./",

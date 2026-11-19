@@ -1,4 +1,5 @@
 const copy = {
+  '스마트 세븐': ['Smart7', 'Smart7'],
   '뒤로': ['Back', '戻る'],
   '참고 사진': ['Reference photo', '参考写真'],
   '축소본': ['Resized', '縮小版'],
@@ -112,7 +113,7 @@ const copy = {
   '읽기': ['Read', '読み取り'],
   '적용': ['Apply', '適用'],
   '언어': ['Language', '言語'],
-  'Smart7 Offline · 커뮤니티 테스트 버전': ['Smart7 Offline · community test release', 'Smart7 Offline · コミュニティテスト版'],
+  '스마트 세븐 · 베타 0.0.1': ['Smart7 · Beta 0.0.1', 'Smart7 · ベータ 0.0.1'],
   '본체 설명서': ['Device manual', '取扱説明書'],
   '닫기': ['Close', '閉じる'],
   '확인': ['OK', '確認'],
@@ -126,8 +127,6 @@ const copy = {
   'Smart7 화면에 표시된 숫자 6자리를 입력하세요.': ['Enter the six digits shown on the Smart7 display.', 'Smart7の画面に表示された6桁の数字を入力してください。'],
   '이 브라우저에 PIN 저장': ['Remember PIN in this browser', 'このブラウザーにPINを保存'],
   '연결 승인': ['Approve connection', '接続を承認'],
-  '오프라인 사용 가능': ['Ready for offline use', 'オフラインで使用可能'],
-  '오프라인 저장을 완료하지 못했습니다.': ['Offline caching could not finish.', 'オフライン保存を完了できませんでした。'],
   'iPhone·iPad 연결 미지원': ['iPhone and iPad connection unavailable', 'iPhone・iPadの接続は非対応'],
   '블루투스 권한을 허용해 주세요': ['Allow Bluetooth access', 'Bluetoothの権限を許可してください'],
   'iPhone과 iPad에서는 Smart7 본체에 연결할 수 없습니다. Android 기기의 Chrome에서 이 주소를 다시 열어 주세요.': ['This app cannot connect to Smart7 on iPhone or iPad. Open this address in Chrome on an Android device.', 'iPhoneやiPadではSmart7に接続できません。Android端末のChromeでこのページを開いてください。'],
