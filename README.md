@@ -17,7 +17,7 @@ HARIO V60 Auto Pour Over Smart7 BT (`EVS-70SV-BT`)용 커뮤니티 웹앱입니�
 - **내 레시피**에서는 사진 카드와 붓기 단계의 손잡이를 끌어서 순서를 바꿀 수 있습니다. 첫 뜸들이기 단계는 고정됩니다. 사진 저장 전에 확대와 자를 위치를 조절할 수 있습니다. 자동 모드는 잔 수별로 온도와 속도를 기억하며 설정을 새 레시피로 저장하거나 기존 레시피에 덮어쓸 수 있습니다.
 - 과열 신호가 오면 추출을 중지하고 배수 화면으로 갈 수 있습니다. 실제 배수는 그 화면에서 시작을 확인해야 합니다. 추출 전 잔수 확인, 세척 준비 단계, 유량 자동 조회와 1–9단 조절, 추출 완료 요약 및 저장된 기기의 별칭·전환을 제공합니다. 헹굼 완료 화면은 본체의 헹굼 진행 신호부터 45초 뒤에 표시됩니다.
 - APK 1.0.6에서 관찰한 BLE 통신을 기준으로 구현했습니다. 가상 GATT와 앱 흐름 테스트를 제공하며 실제 본체에서의 동작은 확인이 필요합니다.
-- [HARIO 서비스 종료 공지](https://shop.hario.co.jp/smart7.html) · [Smart7 본체 설명서](https://smart7.jp/pdf/EVS-70_12P_setumei_L.pdf)
+- [HARIO 서비스 종료 공지](https://shop.hario.co.jp/smart7.html) · [Smart7 BT 본체 설명서 PDF](https://smart7-offline.vercel.app/EVS-70SV-BT-manual.pdf)
 
 ## 개발
 
