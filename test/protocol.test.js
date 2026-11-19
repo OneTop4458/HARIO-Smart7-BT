@@ -76,3 +76,71 @@ test('mock GATT pairing and brew do not need network responses', async () => {
   assert.deepEqual(writes.at(-1), { command: 2, data: [3] });
   device.disconnect();
 });
+
+test('a busy brewer cancels queued preparation and waits for acknowledgement', async () => {
+  const device = new Smart7(() => {});
+  const writes = [];
+  device.send = async (command, payload = []) => { writes.push([command, ...payload]); };
+  device.update({ connection: 'ready' });
+  const brew = device.brew(automaticRecipe(2, 'normal', 93));
+  await device.handleFrame({ command: 2, data: [2, 2, 1, 10] });
+  await brew;
+  assert.equal(device.state.alert, 'busy');
+  assert.deepEqual(writes, [[5]]);
+  await device.acknowledgeAlert();
+  assert.deepEqual(writes, [[5], [2, 3]]);
+  assert.equal(device.state.alert, null);
+});
+
+test('overheat stops brewing and only drains when explicitly requested', async () => {
+  const device = new Smart7(() => {});
+  const writes = [];
+  device.send = async (command, payload = []) => { writes.push([command, ...payload]); };
+  device.update({ connection: 'ready', phase: 'starting' });
+  await device.handleFrame({ command: 3, data: [3] });
+  assert.equal(device.state.alert, 'overheat');
+  assert.deepEqual(writes, [[2, 3]]);
+  await device.acknowledgeAlert(true);
+  assert.equal(device.state.phase, 'draining');
+  assert.deepEqual(writes, [[2, 3], [3, 1]]);
+});
+
+test('rinse timer begins on device progress and completion sends no command', async ({ mock }) => {
+  mock.timers.enable({ apis: ['Date', 'setTimeout'] });
+  const device = new Smart7(() => {});
+  const writes = [];
+  device.send = async (command, payload = []) => { writes.push([command, ...payload]); };
+  device.update({ connection: 'ready' });
+  await device.clean();
+  await device.handleFrame({ command: 2, data: [1, 1, 0, 0] });
+  await device.handleFrame({ command: 2, data: [4, 2, 4, 0] });
+  mock.timers.tick(300000);
+  assert.equal(device.state.phase, 'awaiting-rinse');
+  await device.rinse();
+  mock.timers.tick(90000);
+  assert.equal(device.state.phase, 'rinsing');
+  assert.equal(device.state.seconds, null);
+  await device.handleFrame({ command: 2, data: [4, 2, 5, 0] });
+  mock.timers.tick(44000);
+  await device.handleFrame({ command: 2, data: [4, 2, 5, 0] });
+  assert.equal(device.state.phase, 'rinsing');
+  mock.timers.tick(1000);
+  assert.equal(device.state.alert, 'rinse-complete');
+  await device.acknowledgeAlert();
+  assert.equal(device.state.phase, 'complete');
+  assert.deepEqual(writes, [[4], [13, 1], [13, 1]]);
+});
+
+test('cancelling a rinse clears the completion timer and sends rinse stop only', async ({ mock }) => {
+  mock.timers.enable({ apis: ['Date', 'setTimeout'] });
+  const device = new Smart7(() => {});
+  const writes = [];
+  device.send = async (command, payload = []) => { writes.push([command, ...payload]); };
+  device.update({ connection: 'ready', phase: 'rinsing' });
+  await device.handleFrame({ command: 2, data: [4, 2, 5, 0] });
+  await device.stop();
+  mock.timers.tick(46000);
+  assert.equal(device.state.phase, 'idle');
+  assert.equal(device.state.alert, null);
+  assert.deepEqual(writes, [[13, 0]]);
+});

@@ -40,7 +40,6 @@ export function parseFrames(bytes) {
 
 export const workingPhases = ['starting', 'heating', 'brewing', 'paused', 'draining', 'checking-clean', 'cleaning', 'soaking', 'awaiting-rinse', 'rinsing'];
 const brewPhases = ['starting', 'heating', 'brewing', 'paused'];
-const cleanPhases = ['checking-clean', 'cleaning', 'soaking', 'awaiting-rinse', 'rinsing'];
 const deviceErrors = {
   1: '본체 센서 오류가 감지됐습니다.', 2: '물이 부족합니다.', 3: '온수 오류가 감지됐습니다.',
   4: '본체가 추출 설정을 거부했습니다.', 5: '본체가 명령을 거부했습니다.'
@@ -49,7 +48,8 @@ const deviceErrors = {
 export class Smart7 {
   constructor(onChange) {
     this.onChange = onChange;
-    this.state = { connection: 'disconnected', phase: 'idle', message: '', temperature: null, seconds: null, level: null };
+    this.state = { connection: 'disconnected', phase: 'idle', alert: null, message: '', temperature: null, seconds: null, level: null };
+    this.stageTimer = null;
     this.pending = new Uint8Array();
     this.queue = Promise.resolve();
     this.operation = 0;
@@ -95,13 +95,13 @@ export class Smart7 {
 
   reset(message) {
     clearTimeout(this.pinTimer);
-    clearTimeout(this.soakTimer);
+    this.clearStageTimer();
     this.notifier?.removeEventListener('characteristicvaluechanged', this.receive);
     this.device?.removeEventListener('gattserverdisconnected', this.lost);
     this.device = this.writer = this.notifier = this.expectedPin = null;
     this.pending = new Uint8Array();
     this.operation++;
-    this.update({ connection: 'disconnected', phase: 'idle', message, temperature: null, seconds: null, level: null });
+    this.update({ connection: 'disconnected', phase: 'idle', alert: null, message, temperature: null, seconds: null, level: null });
   }
 
   disconnect(message = '') {
@@ -153,19 +153,33 @@ export class Smart7 {
       return;
     }
     if (command === 6 && data[0] >= 1 && data[0] <= 9) this.update({ level: data[0] });
-    if (command === 3 && deviceErrors[data[0]] && workingPhases.includes(this.state.phase)) {
-      const phase = this.state.phase;
+    const phase = this.state.phase;
+    if (command === 3 && data.length === 1 && deviceErrors[data[0]] && workingPhases.includes(phase)) {
       this.operation++;
-      clearTimeout(this.soakTimer);
-      this.update({ phase: 'idle', message: deviceErrors[data[0]] });
-      if (phase === 'draining') await this.send(3, [2]);
-      else if (cleanPhases.includes(phase)) await this.stopCleaning();
-      else await this.send(2, [3]);
+      this.clearStageTimer();
+      const alert = data[0] === 3 && phase === 'starting' ? 'overheat' : null;
+      this.update({ phase: 'idle', alert, temperature: null, seconds: null, message: deviceErrors[data[0]] });
+      await this.send(2, [3]);
       return;
     }
     if (command !== 2 || data.length !== 4) return;
     const [mode, step, first, second] = data;
-    const phase = this.state.phase;
+    if (mode === 1 && step === 0 && workingPhases.includes(phase)) {
+      if (phase === 'draining') await this.send(13, [0]);
+      this.disconnect('본체가 시작 화면으로 돌아갔습니다. 다시 연결해 주세요.');
+      return;
+    }
+    if (this.state.alert) return;
+    const brewBusy = phase === 'starting' && ((mode === 2 && (step === 2 || step === 3)) || mode === 3 || mode === 4);
+    const drainBusy = phase === 'draining' && (mode === 2 || mode === 4);
+    const cleaningBusy = (phase === 'checking-clean' || phase === 'cleaning') && (mode === 2 || mode === 3);
+    if (brewBusy || drainBusy || cleaningBusy) {
+      this.operation++;
+      this.clearStageTimer();
+      this.alertPhase = phase;
+      this.update({ phase: 'idle', alert: 'busy', message: '기기가 사용 중입니다.', temperature: null, seconds: null });
+      return;
+    }
     if (brewPhases.includes(phase)) {
       if (mode === 2 && step === 1 && phase !== 'paused') this.update({ phase: 'heating', temperature: first });
       if (mode === 2 && step === 2 && phase !== 'paused') this.update({ phase: 'brewing', seconds: first * 60 + second });
@@ -174,20 +188,33 @@ export class Smart7 {
       }
     }
     if (phase === 'draining' && mode === 3 && step === 1) {
+      const confirmation = Promise.all([this.send(3, [2]), this.send(3, [2])]);
       this.update({ phase: 'complete', message: '배수가 완료됐습니다.' });
-      await this.send(3, [2]);
-      await this.send(3, [2]);
+      await confirmation;
     }
     if (phase === 'checking-clean' && mode === 1 && step === 1) {
-      clearTimeout(this.soakTimer);
+      this.clearStageTimer();
       this.update({ phase: 'cleaning', message: '세척 중입니다.' });
       await this.send(13, [1]);
     }
     if (phase === 'cleaning' && mode === 4 && step === 1) this.update({ temperature: first });
     if (phase === 'cleaning' && mode === 4 && step === 2 && first < 5) this.startSoak();
-    if (phase === 'rinsing' && mode === 4 && step === 2 && this.soakTimer === null) {
-      this.soakTimer = setTimeout(() => this.update({ message: '헹굼 상태를 본체에서 확인한 뒤 종료하세요.' }), 45000);
+    if (phase === 'rinsing' && mode === 4 && step === 1) this.update({ temperature: first });
+    if (phase === 'rinsing' && mode === 4 && step === 2 && this.stageTimer === null) {
+      this.startCountdown(45, () => this.update({ phase: 'complete', alert: 'rinse-complete', seconds: 0, message: '헹굼이 완료됐습니다.' }));
     }
+  }
+
+  async acknowledgeAlert(drain = false) {
+    const { alert } = this.state;
+    if (!alert) return;
+    try {
+      if (alert === 'busy') await this.cancelOperation(this.alertPhase);
+      else if (alert === 'overheat' && !drain) await this.send(2, [3]);
+    } finally {
+      this.update({ alert: null, message: alert === 'rinse-complete' ? '헹굼이 완료됐습니다.' : '' });
+    }
+    if (alert === 'overheat' && drain) await this.drain();
   }
 
   async acceptPin(input, remember) {
@@ -207,7 +234,7 @@ export class Smart7 {
 
   checkReady() {
     if (this.state.connection !== 'ready') throw new Error('먼저 본체 연결과 PIN 확인을 완료하세요.');
-    if (workingPhases.includes(this.state.phase)) throw new Error('진행 중인 작업을 먼저 종료하세요.');
+    if (this.state.alert || workingPhases.includes(this.state.phase)) throw new Error('진행 중인 작업을 먼저 종료하세요.');
   }
 
   async brew(input) {
@@ -248,49 +275,74 @@ export class Smart7 {
   }
 
   async stop() {
-    if (!workingPhases.includes(this.state.phase)) return;
+    const phase = this.state.phase;
+    if (!workingPhases.includes(phase)) return;
     this.operation++;
-    clearTimeout(this.soakTimer);
-    if (this.state.phase === 'draining') await this.send(3, [2]);
-    else if (cleanPhases.includes(this.state.phase)) await this.stopCleaning();
-    else await this.send(2, [3]);
+    this.clearStageTimer();
+    await this.cancelOperation(phase);
     this.update({ phase: 'idle', message: '중지 명령을 보냈습니다.', temperature: null, seconds: null });
+  }
+
+  async cancelOperation(phase) {
+    if (phase === 'draining') await this.send(3, [2]);
+    else if (phase === 'rinsing') await this.send(13, [0]);
+    else if (phase === 'checking-clean' || phase === 'cleaning') await this.stopCleaning();
+    else await this.send(2, [3]);
   }
 
   async drain() {
     this.checkReady();
-    await this.send(3, [1]);
     this.update({ phase: 'draining', message: '', temperature: null, seconds: null });
+    try { await this.send(3, [1]); }
+    catch (error) { if (this.state.phase === 'draining') this.update({ phase: 'idle' }); throw error; }
   }
 
   async clean() {
     this.checkReady();
     this.update({ phase: 'checking-clean', message: '본체가 준비 상태인지 확인 중입니다.', seconds: null, temperature: null });
     try { await this.send(4); } catch (error) { this.update({ phase: 'idle' }); throw error; }
-    if (this.state.phase === 'checking-clean') this.soakTimer = setTimeout(() => {
+    if (this.state.phase === 'checking-clean') this.stageTimer = setTimeout(() => {
       this.update({ phase: 'idle', message: '본체가 준비 상태인지 확인한 뒤 다시 시도하세요.' });
     }, 12000);
   }
 
   startSoak() {
-    this.update({ phase: 'soaking', message: '5분간 기다린 뒤 깨끗한 물로 헹굼을 시작하세요.', seconds: 300 });
-    const end = Date.now() + 300000;
+    this.update({ phase: 'soaking', message: '5분간 기다린 뒤 깨끗한 물로 헹굼을 시작하세요.' });
+    this.startCountdown(300, () => this.update({ phase: 'awaiting-rinse', seconds: 0, message: '깨끗한 물과 받침 용기를 준비하세요.' }));
+  }
+
+  clearStageTimer() {
+    clearTimeout(this.stageTimer);
+    this.stageTimer = null;
+  }
+
+  startCountdown(duration, complete) {
+    const end = Date.now() + duration * 1000;
     const tick = () => {
       const seconds = Math.max(0, Math.ceil((end - Date.now()) / 1000));
-      if (seconds === 0) this.update({ phase: 'awaiting-rinse', seconds: 0, message: '깨끗한 물과 받침 용기를 준비하세요.' });
-      else {
-        this.update({ seconds });
-        this.soakTimer = setTimeout(tick, 1000);
+      if (seconds === 0) {
+        this.stageTimer = null;
+        complete();
+        return;
       }
+      this.stageTimer = setTimeout(tick, 1000);
+      this.update({ seconds });
     };
-    this.soakTimer = setTimeout(tick, 1000);
+    tick();
   }
 
   async rinse() {
     if (this.state.phase !== 'awaiting-rinse') return;
-    this.soakTimer = null;
-    await this.send(13, [1]);
+    this.clearStageTimer();
     this.update({ phase: 'rinsing', message: '본체에서 헹굼 진행을 확인하세요.', seconds: null });
+    try { await this.send(13, [1]); }
+    catch (error) {
+      if (this.state.phase === 'rinsing') {
+        this.clearStageTimer();
+        this.update({ phase: 'awaiting-rinse', seconds: 0 });
+      }
+      throw error;
+    }
   }
 
   async stopCleaning() {

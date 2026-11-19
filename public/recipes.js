@@ -1,3 +1,5 @@
+import { t } from './i18n.js';
+
 const profiles = {
   normal: {
     2: [[30, 5, 25], [100, 18, 6], [70, 13, 6], [70, 13, 0]],
@@ -38,15 +40,15 @@ export function validateRecipe(recipe) {
   }
   for (const [index, step] of recipe.steps.entries()) {
     if (!step || !Number.isInteger(step.volume) || step.volume < 20 || step.volume > 700 || step.volume % 10) {
-      throw new Error(`${index + 1}단계의 물량을 20mL 이상, 10mL 단위로 설정하세요.`);
+      throw new Error(t('{index}단계의 물량을 20mL 이상, 10mL 단위로 설정하세요.', { index: index + 1 }));
     }
     const min = step.volume / 10;
     const max = Math.min(80, Math.floor(step.volume / 3));
     if (!Number.isInteger(step.pour) || step.pour < min || step.pour > max) {
-      throw new Error(`${index + 1}단계의 붓는 시간은 ${min}~${max}초여야 합니다.`);
+      throw new Error(t('{index}단계의 붓는 시간은 {min}~{max}초여야 합니다.', { index: index + 1, min, max }));
     }
     if (!Number.isInteger(step.wait) || step.wait < 0 || step.wait > 60) {
-      throw new Error(`${index + 1}단계의 대기 시간은 0~60초여야 합니다.`);
+      throw new Error(t('{index}단계의 대기 시간은 0~60초여야 합니다.', { index: index + 1 }));
     }
   }
   const { volume } = summarize(recipe.steps);
@@ -60,6 +62,12 @@ export function validateRecipe(recipe) {
       throw new Error('원두량은 100g 이하로 입력하세요.');
     }
     validated.grounds = recipe.grounds;
+  }
+  if (recipe.photo != null) {
+    if (typeof recipe.photo !== 'string' || recipe.photo.length > 200000 || !/^data:image\/jpeg;base64,\/9j\/[A-Za-z0-9+/]*={0,2}$/.test(recipe.photo)) {
+      throw new Error('레시피 사진은 200KB 이하의 JPEG여야 합니다.');
+    }
+    validated.photo = recipe.photo;
   }
   if (recipe.source != null) {
     const { label, url } = recipe.source;
@@ -85,7 +93,7 @@ function fromSharedRecipe(recipe) {
   })).filter(step => step.volume !== 0 || step.pour !== 0 || step.wait !== 0);
   const id = String(recipe.recipe_id ?? '');
   const name = [recipe.recipe_name, recipe.user_name].find(value => typeof value === 'string' && value.trim())
-    || (id ? `Smart7 레시피 ${id}` : 'Smart7 공유 레시피');
+    || (id ? t('Smart7 레시피 {id}', { id }) : t('Smart7 공유 레시피'));
   const grounds = typeof recipe.coffee_grounds === 'string' && !recipe.coffee_grounds.trim() ? undefined : legacyNumber(recipe.coffee_grounds);
   const source = /^\d+$/.test(id) ? {
     label: `Smart7 Shared Recipes · No.${id}`, url: `https://smart7.jp/detail_kr.php?recipe_no=${id}`
@@ -110,7 +118,7 @@ export function parseRecipeFile(text) {
     try {
       return validateRecipe(Array.isArray(record?.detail) ? fromSharedRecipe(record) : record);
     } catch (error) {
-      throw new Error(`${index + 1}번째 레시피 · ${error.message}`);
+      throw new Error(t('{index}번째 레시피 · {message}', { index: index + 1, message: t(error.message) }));
     }
   });
 }

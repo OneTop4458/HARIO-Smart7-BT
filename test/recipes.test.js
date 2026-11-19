@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { publicRecipes } from '../public/recipe-library.js';
 import { automaticRecipe, parseRecipeFile, summarize, validateRecipe } from '../public/recipes.js';
+import { brewPoints } from '../public/brew-graph.js';
 
 test('public recipes match the published totals and fit the brew validator', () => {
   const expected = {
@@ -53,4 +54,12 @@ test('malformed recipes and unsafe attribution links are rejected', () => {
   const recipe = publicRecipes[0];
   assert.throws(() => parseRecipeFile(JSON.stringify([recipe, { ...recipe, temperature: 99 }])), /2번째 레시피/);
   assert.throws(() => validateRecipe({ ...recipe, source: { label: 'recipe', url: 'javascript:alert(1)' } }), /HTTPS 주소/);
+});
+
+test('graph steps rise during pouring and stay flat during waits', () => {
+  const points = brewPoints([{ volume: 70, pour: 8, wait: 30 }, { volume: 200, pour: 40, wait: 10 }]);
+  assert.deepEqual(points, [
+    { seconds: 0, volume: 0 }, { seconds: 8, volume: 70 }, { seconds: 38, volume: 70 },
+    { seconds: 78, volume: 270 }, { seconds: 88, volume: 270 }
+  ]);
 });
