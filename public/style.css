@@ -43,7 +43,7 @@ button:disabled { opacity: .55; cursor: default; }
 #connection-dot.ready { background: var(--olive); }
 #connection-dot.pending { background: #ffd291; }
 #compatibility { margin: 5px 0 18px; }
-.console-menu { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin: 0 0 22px; }
+.console-menu { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; margin: 0 0 22px; }
 .mode { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .mode-label { display: flex; align-items: center; gap: 12px; min-height: 74px; padding: 10px 16px; border: 1px solid transparent; border-radius: 5px; font-size: 1.07rem; font-weight: 700; color: #f6fafe; transition: background-color 160ms ease, border-color 160ms ease; }
 .mode-label::before { content: ''; width: 9px; height: 9px; border: 1px solid #c0d7e5; border-radius: 50%; }
@@ -51,6 +51,8 @@ button:disabled { opacity: .55; cursor: default; }
 .mode-label img { width: 44px; height: 44px; border-radius: 3px; object-fit: cover; }
 .mode-auto { background: #384f65; }
 .mode-recipes { background: #3b5964; }
+.mode-library { background: #394f60; }
+.mode-library:hover:not(:disabled) { background: #486475; }
 .mode-maintenance { background: #465762; }
 .mode-maintenance:hover { background: #516674; color: white; }
 .mode input:checked + .mode-label { border-color: #b4d8eb; box-shadow: inset 3px 0 #b4d8eb; }
@@ -88,6 +90,8 @@ legend { margin-bottom: 8px; }
 .segments input:checked + span { border-color: var(--accent); color: #d7f1ff; background: #374d60; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: end; }
 .saved-row { grid-template-columns: minmax(0, 1fr) auto; }
+.recipe-details { align-items: center; }
+.source-link { text-decoration: underline; text-underline-offset: .2em; overflow-wrap: anywhere; }
 .settings label { min-width: 0; }
 input:not([type=radio], [type=checkbox], [type=file]), select { height: 41px; width: 100%; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); color: var(--ink); padding: 6px 10px; }
 .form-row input, .form-row select, .recipe-step input, dialog label:not(.check) input { display: block; margin-top: 5px; }
@@ -136,6 +140,13 @@ dialog .check { display: flex; align-items: center; gap: 8px; margin-top: 10px; 
 .check input { accent-color: var(--accent); width: 16px; height: 16px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 19px; }
 .error { color: #ffc4b7; }
+
+.library-dialog { width: min(580px, 100% - 32px); max-height: 85dvh; }
+.library-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.library-list { list-style: none; padding: 0; margin: 14px 0 0; }
+.library-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.library-list strong, .library-list small, .library-list a { display: block; }
+.library-list small { color: var(--muted); margin-block: 3px; }
 
 @media (max-width: 800px) {
   .wrap { width: calc(100% - 32px); }

@@ -1,7 +1,7 @@
-const CACHE = 'smart7-offline-v3';
+const CACHE = 'smart7-offline-v4';
 const assets = [
   './', './index.html', './style.css', './app.js', './protocol.js', './recipes.js', './app.webmanifest',
-  './coffee.webp', './icon-192.png', './icon-512.png'
+  './coffee.webp', './icon-192.png', './icon-512.png', './recipe-library.js'
 ].map(path => new URL(path, self.registration.scope).href);
 
 self.addEventListener('install', event => {

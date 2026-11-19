@@ -1,4 +1,5 @@
-import { automaticRecipe, summarize, validateRecipe } from './recipes.js';
+import { automaticRecipe, parseRecipeFile, summarize, validateRecipe } from './recipes.js';
+import { publicRecipes } from './recipe-library.js';
 import { Smart7, workingPhases } from './protocol.js';
 
 const $ = id => document.getElementById(id);
@@ -7,6 +8,7 @@ const custom = $('custom-settings');
 const pinDialog = $('pin-dialog');
 const pinForm = $('pin-form');
 const confirmDialog = $('confirm-dialog');
+const libraryDialog = $('recipe-library');
 const storageKey = 'smart7-recipes';
 let mode = 'auto';
 let selected = '';
@@ -46,6 +48,8 @@ function formRecipe() {
   return {
     name: custom.elements.namedItem('name').value,
     temperature: custom.elements.namedItem('temperature').valueAsNumber,
+    grounds: custom.elements.namedItem('grounds').value === '' ? undefined : custom.elements.namedItem('grounds').valueAsNumber,
+    source: recipes.find(recipe => recipe.id === selected)?.source,
     steps: [...$('steps').children].map(row => {
       const [volume, pour, wait] = [...row.querySelectorAll('input')].map(input => input.valueAsNumber);
       return { volume, pour, wait };
@@ -109,6 +113,7 @@ function render(state) {
   }
   document.querySelector('.recipe-settings').inert = locked;
   document.querySelector('.mode').inert = locked;
+  $('open-library').disabled = locked;
   if (state.connection === 'pin' && !pinDialog.open) {
     pinForm.reset();
     $('pin-error').hidden = true;
@@ -209,6 +214,16 @@ function loadRecipe(id) {
   const recipe = recipes.find(item => item.id === id) || automaticRecipe(2, 'normal', 93);
   custom.elements.namedItem('name').value = id ? recipe.name : '';
   custom.elements.namedItem('temperature').value = recipe.temperature;
+  custom.elements.namedItem('grounds').value = recipe.grounds ?? '';
+  const source = $('recipe-source');
+  source.hidden = !recipe.source;
+  if (recipe.source) {
+    source.href = recipe.source.url;
+    source.textContent = recipe.source.label;
+  } else {
+    source.removeAttribute('href');
+    source.textContent = '';
+  }
   $('steps').replaceChildren();
   for (const step of recipe.steps) appendStep(step);
   refreshOptions();
@@ -218,6 +233,30 @@ function loadRecipe(id) {
 function saveRecipes(items) {
   localStorage.setItem(storageKey, JSON.stringify(items));
   recipes = items;
+}
+
+function recipeKey(recipe) {
+  const steps = recipe.steps.map(({ volume, pour, wait }) => [volume, pour, wait]);
+  return JSON.stringify([recipe.name.trim(), recipe.temperature, recipe.grounds || 0, steps]);
+}
+
+function addRecipes(items) {
+  const next = [...recipes];
+  const saved = new Map(recipes.map(recipe => [recipeKey(recipe), recipe.id]));
+  let firstId;
+  for (const recipe of items) {
+    const key = recipeKey(recipe);
+    let id = saved.get(key);
+    if (!id) {
+      id = crypto.randomUUID();
+      next.push({ id, ...recipe });
+      saved.set(key, id);
+    }
+    firstId ??= id;
+  }
+  const added = next.length - recipes.length;
+  if (added) saveRecipes(next);
+  return { firstId, added };
 }
 
 function settingsChanged() {
@@ -255,28 +294,68 @@ $('delete-recipe').addEventListener('click', () => confirmAction('저장한 레�
   loadRecipe('');
   brewer.update({ message: '레시피를 삭제했습니다.' });
 }));
-$('export-recipes').addEventListener('click', () => {
-  const url = URL.createObjectURL(new Blob([JSON.stringify({ version: 1, recipes }, null, 2)], { type: 'application/json' }));
+function exportFile(data, filename) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'smart7-recipes.json';
+  link.download = filename;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+$('export-recipe').addEventListener('click', () => {
+  try { exportFile(validateRecipe(formRecipe()), 'smart7-recipe.json'); }
+  catch (error) { brewer.update({ message: error.message }); }
 });
+$('export-recipes').addEventListener('click', () => exportFile({ version: 1, recipes }, 'smart7-recipes.json'));
 $('import-recipes').addEventListener('change', async event => {
   const file = event.target.files[0];
   event.target.value = '';
   if (!file) return;
   try {
     if (file.size > 1000000) throw new Error('1MB 이하 레시피 파일을 선택하세요.');
-    const data = JSON.parse(await file.text());
-    if (data.version !== 1 || !Array.isArray(data.recipes) || data.recipes.length === 0) throw new Error('Smart7 Offline 레시피 파일을 선택하세요.');
-    const imported = data.recipes.map(recipe => ({ id: crypto.randomUUID(), ...validateRecipe(recipe) }));
-    saveRecipes([...recipes, ...imported]);
-    loadRecipe(imported[0].id);
-    brewer.update({ message: `레시피 ${imported.length}개를 가져왔습니다.` });
+    const imported = parseRecipeFile(await file.text());
+    const { firstId, added } = addRecipes(imported);
+    loadRecipe(firstId);
+    const skipped = imported.length - added;
+    const message = added ? `레시피 ${added}개를 가져왔습니다.` : '모든 레시피가 이미 저장되어 있습니다.';
+    brewer.update({ message: added && skipped ? `${message} 중복 ${skipped}개는 건너뛰었습니다.` : message });
   } catch (error) { brewer.update({ message: `가져오기 실패. ${error.message}` }); }
 });
+
+function addPublicRecipe(recipe) {
+  try {
+    const { firstId, added } = addRecipes([validateRecipe(recipe)]);
+    libraryDialog.close();
+    const option = document.querySelector('.mode [value="custom"]');
+    option.checked = true;
+    option.dispatchEvent(new Event('change', { bubbles: true }));
+    loadRecipe(firstId);
+    $('saved-recipes').focus();
+    brewer.update({ message: added ? '공개 레시피를 내 레시피에 추가했습니다.' : '이미 저장된 레시피를 열었습니다.' });
+  } catch (error) {
+    libraryDialog.close();
+    brewer.update({ message: error.message });
+  }
+}
+for (const recipe of publicRecipes) {
+  const item = document.createElement('li');
+  const details = document.createElement('div');
+  const name = document.createElement('strong');
+  const metrics = document.createElement('small');
+  const source = document.createElement('a');
+  const add = document.createElement('button');
+  const { volume } = summarize(recipe.steps);
+  name.textContent = recipe.name;
+  metrics.textContent = `${recipe.temperature} °C · ${volume} mL · 원두 ${recipe.grounds} g`;
+  Object.assign(source, { href: recipe.source.url, target: '_blank', rel: 'noopener noreferrer', className: 'micro source-link', textContent: recipe.source.label });
+  Object.assign(add, { type: 'button', className: 'secondary', textContent: '추가' });
+  add.setAttribute('aria-label', `${recipe.name} 추가`);
+  add.addEventListener('click', () => addPublicRecipe(recipe));
+  details.append(name, metrics, source);
+  item.append(details, add);
+  $('library-list').append(item);
+}
+$('open-library').addEventListener('click', () => libraryDialog.showModal());
 
 $('connect').addEventListener('click', () => brewer.connect());
 $('reconnect').addEventListener('click', () => brewer.connect(true));

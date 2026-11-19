@@ -37,6 +37,7 @@
         <label><input type="radio" name="mode" value="auto" checked><span class="mode-label mode-auto">자동 모드</span></label>
         <label><input type="radio" name="mode" value="custom"><span class="mode-label mode-recipes"><img src="./coffee.webp" alt="" width="56" height="56">내 레시피</span></label>
       </fieldset>
+      <button type="button" class="mode-label mode-library" id="open-library">공개 레시피</button>
       <a class="mode-label mode-maintenance" href="#maintenance">기기 관리</a>
     </nav>
 
@@ -64,14 +65,19 @@
           <form id="custom-settings" class="settings" aria-label="내 레시피 편집" hidden>
             <div class="form-row saved-row"><label>저장한 레시피 <select id="saved-recipes"><option value="">새 레시피</option></select></label><button type="button" id="new-recipe" class="quiet">새로 만들기</button></div>
             <div class="form-row"><label>레시피 이름 <input name="name" maxlength="60" required></label><label>물 온도 (°C) <input type="number" name="temperature" min="80" max="96" value="93" required></label></div>
+            <div class="form-row recipe-details">
+              <label>원두량 (g) <input type="number" name="grounds" min="0" max="100" step="any" placeholder="선택"></label>
+              <a id="recipe-source" class="micro source-link" target="_blank" rel="noopener noreferrer" hidden></a>
+            </div>
             <fieldset class="recipe-steps"><legend>추출 단계</legend>
               <div id="steps"></div>
               <button id="add-step" class="quiet" type="button">단계 추가</button>
             </fieldset>
             <div class="recipe-actions">
               <button type="submit" class="secondary">저장</button>
-              <button type="button" class="quiet" id="export-recipes">내보내기</button>
-              <label class="quiet file-label">가져오기<input id="import-recipes" type="file" accept=".json,application/json"></label>
+              <label class="quiet file-label">JSON 가져오기<input id="import-recipes" type="file" accept=".json,application/json"></label>
+              <button type="button" class="quiet" id="export-recipe">이 레시피 내보내기</button>
+              <button type="button" class="quiet" id="export-recipes">전체 내보내기</button>
               <button type="button" id="delete-recipe" class="quiet" hidden>삭제</button>
             </div>
           </form>
@@ -115,6 +121,15 @@
   </main>
 
   <footer class="wrap footer"><span>Smart7 Offline · 커뮤니티 테스트 버전</span><div><a href="https://smart7.jp/pdf/EVS-70_12P_setumei_L.pdf" rel="noopener">본체 설명서</a><a href="https://github.com/OneTop4458/smart7-offline" rel="noopener">GitHub</a></div></footer>
+
+  <dialog id="recipe-library" class="library-dialog" aria-labelledby="library-title">
+    <div class="library-heading">
+      <h2 id="library-title">공개 레시피</h2>
+      <form method="dialog"><button type="submit" class="quiet">닫기</button></form>
+    </div>
+    <p class="micro">예전 Smart7 공유 페이지의 설정값입니다. 원본 링크는 서비스 종료 안내로 연결될 수 있습니다.</p>
+    <ul class="library-list" id="library-list"></ul>
+  </dialog>
 
   <dialog id="platform-dialog" aria-labelledby="platform-title" aria-describedby="platform-message">
     <form method="dialog">

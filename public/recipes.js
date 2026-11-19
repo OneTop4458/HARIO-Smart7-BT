@@ -51,8 +51,66 @@ export function validateRecipe(recipe) {
   }
   const { volume } = summarize(recipe.steps);
   if (volume < 270 || volume > 700) throw new Error('총 물량은 270~700mL 사이여야 합니다.');
-  return {
+  const validated = {
     name: recipe.name.trim(), temperature: recipe.temperature,
     steps: recipe.steps.map(({ volume, pour, wait }) => ({ volume, pour, wait }))
   };
+  if (recipe.grounds != null && recipe.grounds !== 0) {
+    if (!Number.isFinite(recipe.grounds) || recipe.grounds < 0 || recipe.grounds > 100) {
+      throw new Error('원두량은 100g 이하로 입력하세요.');
+    }
+    validated.grounds = recipe.grounds;
+  }
+  if (recipe.source != null) {
+    const { label, url } = recipe.source;
+    let link;
+    if (typeof url === 'string') {
+      try { link = new URL(url); } catch { /* Invalid sources are reported below. */ }
+    }
+    if (typeof label !== 'string' || !label.trim() || label.length > 120 || link?.protocol !== 'https:' || link.username || link.password) {
+      throw new Error('레시피 출처에 HTTPS 주소와 이름을 입력하세요.');
+    }
+    validated.source = { label: label.trim(), url: link.href };
+  }
+  return validated;
+}
+
+function legacyNumber(value) {
+  return typeof value === 'string' && /^\d+(?:\.\d+)?$/.test(value.trim()) ? Number(value) : value;
+}
+
+function fromSharedRecipe(recipe) {
+  const steps = recipe.detail.map(step => ({
+    volume: legacyNumber(step?.water), pour: legacyNumber(step?.time), wait: legacyNumber(step?.interval)
+  })).filter(step => step.volume !== 0 || step.pour !== 0 || step.wait !== 0);
+  const id = String(recipe.recipe_id ?? '');
+  const name = [recipe.recipe_name, recipe.user_name].find(value => typeof value === 'string' && value.trim())
+    || (id ? `Smart7 레시피 ${id}` : 'Smart7 공유 레시피');
+  const grounds = typeof recipe.coffee_grounds === 'string' && !recipe.coffee_grounds.trim() ? undefined : legacyNumber(recipe.coffee_grounds);
+  const source = /^\d+$/.test(id) ? {
+    label: `Smart7 Shared Recipes · No.${id}`, url: `https://smart7.jp/detail_kr.php?recipe_no=${id}`
+  } : undefined;
+  const declaredVolume = legacyNumber(recipe.water);
+  if (Number.isFinite(declaredVolume) && declaredVolume > 0 && declaredVolume !== summarize(steps).volume) {
+    throw new Error('공유 레시피의 총 물량과 단계별 물량 합계가 다릅니다.');
+  }
+  return { name, temperature: legacyNumber(recipe.temperature), grounds, source, steps };
+}
+
+export function parseRecipeFile(text) {
+  let data;
+  try { data = JSON.parse(text.replace(/^\uFEFF/, '')); }
+  catch { throw new Error('올바른 JSON 파일을 선택하세요.'); }
+  let records = data;
+  if (data?.version === 1) records = data.recipes;
+  else if (data?.status_code === true) records = data.data;
+  else if (data?.steps || data?.detail) records = [data];
+  if (!Array.isArray(records) || records.length === 0) throw new Error('레시피가 들어 있는 JSON 파일을 선택하세요.');
+  return records.map((record, index) => {
+    try {
+      return validateRecipe(Array.isArray(record?.detail) ? fromSharedRecipe(record) : record);
+    } catch (error) {
+      throw new Error(`${index + 1}번째 레시피 · ${error.message}`);
+    }
+  });
 }
