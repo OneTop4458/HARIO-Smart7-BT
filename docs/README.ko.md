@@ -57,6 +57,8 @@ sequenceDiagram
 
 ## 개발
 
+[HTTP API와 레시피 형식](api.md) · [BLE 프로토콜과 Android APK 분석](smart7-analysis.md) · [레시피 출처](recipe-sources.md)
+
 ```sh
 npm test
 python -m http.server 8080 --directory public

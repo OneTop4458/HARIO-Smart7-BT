@@ -59,6 +59,8 @@ sequenceDiagram
 
 ## Development
 
+See the [HTTP API and recipe format](docs/api.md), [BLE protocol and Android APK analysis](docs/smart7-analysis.md), and [recipe sources](docs/recipe-sources.md).
+
 ```sh
 npm test
 python -m http.server 8080 --directory public
