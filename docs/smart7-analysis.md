@@ -15,6 +15,8 @@ Scope is the HARIO V60 Auto Pour Over Smart7 BT (EVS-70SV-BT) and Android app `c
 
 The official Android app exposed a guest path. The pairing and brewing call chains under that path have no required HTTP response before the device starts heating. On the original sharing path, `URLConstants` points to `smart7.jp`, and the client refers to `login.php`, `member.php`, `token.php`, `recipes.php`, `recipe_detail.php`, `upload.php`, and `image.php`. These names are historical observations from the APK. HARIO announced it had shut down the server and closed the related website. [HARIO service closure notice](https://shop.hario.co.jp/smart7.html)
 
+The recipe list and detail endpoints both returned HTTP `301` to the closure notice when checked on 2026-11-19 with the APK's original POST requests. The redirect returned HTTP `200` with the HTML notice. The Wayback availability index returned no snapshot for either endpoint.
+
 The web app retains a separate public GitHub catalog. When the service worker has cached the application shell, the browser can reopen it and use saved local recipes without an internet connection. Fetching the community catalog and its comments needs internet access. Native app backups and HARIO accounts have no migration path in the current web app. [Service worker](../public/sw.js) · [Browser application](../public/app.js)
 
 ## BLE connection and PIN
