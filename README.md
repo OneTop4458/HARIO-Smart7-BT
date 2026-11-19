@@ -23,6 +23,8 @@ python -m http.server 8080 --directory public
 
 `http://localhost:8080`에서 엽니다. 정적 배포의 출력 디렉터리는 `public/`입니다. BLE 연결은 브라우저 보안 컨텍스트와 사용자의 기기 선택을 요구합니다.
 
+Vercel 프로젝트는 GitHub 저장소에 연결돼 있습니다. `main` 브랜치의 푸시가 운영 배포를 시작합니다. 앱은 정적 CDN으로 제공됩니다.
+
 - `public/protocol.js`는 GATT 세션, 패킷 인코딩과 추출 상태를 처리합니다.
 - `public/recipes.js`는 자동 레시피와 입력 한도를 정의합니다.
 - `public/sw.js`는 오프라인 사용에 필요한 앱 파일을 캐시합니다.

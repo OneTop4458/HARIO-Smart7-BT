@@ -145,7 +145,7 @@ dialog .check { display: flex; align-items: center; gap: 8px; margin-top: 10px; 
 @media (max-width: 595px) {
   .site-header nav { gap: 12px; }
   nav a:last-child { display: none; }
-  .site-header { min-height: 55px; }
+  .site-header { min-height: 55px; flex-wrap: wrap; padding-block: 7px; }
   .wordmark { font-size: .98rem; }
   .site-header nav a { font-size: .8rem; }
   .hero { display: block; padding: 26px 0; }
