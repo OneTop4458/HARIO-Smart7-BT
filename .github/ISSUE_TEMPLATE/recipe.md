@@ -5,8 +5,14 @@ title: "[레시피] "
 labels: recipe
 ---
 
-**본문 / Post**
+## 원두 / Beans
 
-<!-- 레시피를 공유한다면 원두, 분쇄도와 추출 결과를 적어 주세요. / For a recipe, share the beans, grind and brew notes. -->
+## 분쇄도 / Grind
 
-<!-- 웹앱의 내 레시피 편집 화면에서 GitHub에 레시피 제안을 누르면 추출 설정을 첨부할 수 있습니다. -->
+## 추출 메모 / Brew notes
+
+## 출처 / Source
+
+## 추출 설정 / Brew settings
+
+<!-- 웹앱에서 레시피 공유를 누르면 온도와 추출 단계가 자동으로 첨부됩니다. / Use Share recipe in the app to attach the brew settings. -->

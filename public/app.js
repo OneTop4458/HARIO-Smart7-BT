@@ -1,7 +1,6 @@
 import { automaticRecipe, parseRecipeFile, summarize, validateRecipe } from './recipes.js';
-import { publicRecipeId, publicRecipes } from './recipe-library.js';
-import { publicDetails, recipePhoto } from './recipe-details.js';
-import { getCommunityIssue, issueRecipe, issueUrl, listCommunityIssues, listIssueComments, recipeProposalUrl } from './community-recipes.js';
+import { recipePhoto } from './recipe-photos.js';
+import { getCommunityIssue, issueRecipe, issueTitle, issueUrl, listCommunityIssues, listIssueComments, recipeProposalUrl } from './community-recipes.js';
 import { Smart7, workingPhases } from './protocol.js';
 import { drawBrewGraph } from './brew-graph.js';
 import { localizeStatic, setLanguage, t } from './i18n.js';
@@ -27,8 +26,7 @@ const storageKey = 'smart7-recipes';
 let mode = 'auto';
 let route = 'home';
 let shownScreen = '';
-let sharedRecipe;
-let postRecipe;
+let postDraft;
 let topicNumber;
 let topicRequest = 0;
 let topicRecipe;
@@ -80,7 +78,7 @@ const appleMobile = /iPhone|iPad|iPod/i.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const android = navigator.userAgentData?.platform === 'Android' || /Android/i.test(navigator.userAgent);
 const supported = !appleMobile && window.isSecureContext && !!navigator.bluetooth;
-const screenParents = { auto: 'home', recipes: 'home', editor: 'recipes', library: 'home', 'shared-detail': 'library', 'community-topic': 'library', maintenance: 'home' };
+const screenParents = { auto: 'home', recipes: 'home', editor: 'recipes', library: 'home', 'community-topic': 'library', maintenance: 'home' };
 const sections = [...document.querySelectorAll('.screen')];
 const listScroll = new Map();
 
@@ -122,13 +120,12 @@ function applyRoute() {
     history.replaceState(history.state, '', route === 'home' ? location.pathname + location.search : location.pathname + location.search + '#' + route);
     return;
   }
-  const id = hash.startsWith('shared/') ? Number(hash.slice(7)) : 0;
-  const detail = id && publicRecipes.find(recipe => publicRecipeId(recipe) === id);
   const number = /^community\/([1-9]\d*)$/.exec(hash)?.[1];
-  const next = detail ? 'shared-detail' : number ? 'community-topic'
-    : Object.hasOwn(screenParents, hash) && !['shared-detail', 'community-topic'].includes(hash) ? hash : 'home';
+  const archiveId = /^shared\/([1-9]\d*)$/.exec(hash)?.[1];
+  const topic = number ?? (archiveId ? 'archive-' + archiveId : null);
+  const next = topic ? 'community-topic' : Object.hasOwn(screenParents, hash) && hash !== 'community-topic' ? hash : 'home';
   const enteringBoard = next === 'library' && route !== 'library';
-  const enteringTopic = next === 'community-topic' && (route !== next || topicNumber !== number);
+  const enteringTopic = next === 'community-topic' && (route !== next || topicNumber !== topic);
   if (route === 'maintenance' && next !== route) {
     $('flow-tools').open = false;
     brewer.showCalibration(false);
@@ -136,14 +133,10 @@ function applyRoute() {
   route = next;
   if (route === 'auto') setMode('auto');
   if (route === 'editor') setMode('custom');
-  if (detail) {
-    sharedRecipe = detail;
-    renderSharedDetail();
-  }
   render(brewer.state);
   if (enteringBoard) void loadCommunityBoard();
   if (enteringTopic) {
-    topicNumber = number;
+    topicNumber = topic;
     void loadCommunityTopic();
   }
 }
@@ -818,41 +811,54 @@ function renderSavedCards() {
   }));
 }
 
-function renderLibrary() {
-  $('library-list').replaceChildren(...publicRecipes.map(recipe => {
-    const id = publicRecipeId(recipe);
-    const item = recipeCard(recipe, recipePhoto(id).file, () => go('shared/' + id));
-    const attribution = document.createElement('small');
-    attribution.className = 'card-credit';
-    attribution.textContent = t('참고 사진');
-    item.querySelector('.card-picture').append(attribution);
+function libraryCard(issue) {
+  const name = issueTitle(issue) || issue.title;
+  const open = () => go('community/' + issue.number);
+  const attachment = issueRecipe(issue);
+  if (attachment) {
+    const item = recipeCard({ ...attachment.recipe, name }, recipePhoto(attachment.archive?.photo).file, open);
+    const credit = document.createElement('small');
+    credit.className = 'card-credit';
+    credit.textContent = t('참고 사진');
+    item.querySelector('.card-picture').append(credit);
     return item;
-  }));
+  }
+  const item = document.createElement('li');
+  const button = document.createElement('button');
+  const title = document.createElement('strong');
+  const meta = document.createElement('small');
+  button.type = 'button';
+  button.className = 'recipe-card discussion-card';
+  title.textContent = name;
+  meta.textContent = `@${issue.user?.login ?? 'ghost'} · ${t('댓글 {count}개', { count: issue.comments })}`;
+  button.append(title, meta);
+  button.addEventListener('click', open);
+  item.append(button);
+  return item;
 }
 
-function renderSharedDetail() {
-  const recipe = sharedRecipe;
-  const id = publicRecipeId(recipe);
-  const { beans, grind, ice, grinder, description } = publicDetails.get(id);
-  const { file, author, source, license, licenseUrl } = recipePhoto(id);
+function renderSharedDetail(recipe, archive, details) {
+  const { beans, grind, ice, grinder, description, guide } = archive ?? details ?? {};
+  const { file, author, source, license, licenseUrl } = recipePhoto(archive?.photo);
   const { volume, seconds } = summarize(recipe.steps);
   const locale = document.documentElement.lang;
-  const local = values => values?.[locale === 'en' ? 1 : locale === 'ja' ? 2 : 0] ?? t('원문에 미기재');
-  $('shared-title').textContent = recipe.name;
+  const local = values => Array.isArray(values) ? values[locale === 'en' ? 1 : locale === 'ja' ? 2 : 0] : values;
   $('shared-photo').src = file;
   $('shared-photo-credit').href = source;
   $('shared-photo-credit').textContent = author;
   $('shared-photo-license').href = licenseUrl;
   $('shared-photo-license').textContent = license;
-  $('shared-description').textContent = local(description);
-  $('shared-grinder').textContent = grinder || '';
+  $('shared-description').textContent = local(description) ?? '';
+  $('shared-description').hidden = !$('shared-description').textContent;
+  $('shared-grinder').textContent = typeof grinder === 'string' ? grinder : '';
   $('shared-grinder').hidden = !grinder;
   const values = [
-    ['원두', local(beans)], ['분쇄도', grind ? t(grind) : t('원문에 미기재')],
-    ['원두량 (g)', `${recipe.grounds} g`], ['물 온도', `${recipe.temperature} °C`],
+    ['물 온도', `${recipe.temperature} °C`],
     ['총 물량', `${volume} mL`], ['예상 추출 시간', formatDuration(seconds)]
   ];
-  if (ice) values.push(['원문 얼음량', `${ice} g`]);
+  if (recipe.grounds != null) values.unshift(['원두량 (g)', `${recipe.grounds} g`]);
+  if (archive || beans || grind) values.unshift(['원두', local(beans) || t('원문에 미기재')], ['분쇄도', typeof grind === 'string' && grind ? t(grind) : t('원문에 미기재')]);
+  if (Number.isFinite(ice) && ice > 0) values.push(['원문 얼음량', `${ice} g`]);
   $('shared-values').replaceChildren(...values.flatMap(([label, value]) => {
     const term = document.createElement('dt');
     const detail = document.createElement('dd');
@@ -860,48 +866,43 @@ function renderSharedDetail() {
     detail.textContent = value;
     return [term, detail];
   }));
-  $('shared-source').href = recipe.source.url;
-  $('shared-source').textContent = recipe.source.label;
-  $('shared-archive').hidden = id < 1069 || id > 1072;
-  $('shared-source-note').hidden = id === 1061;
+  const originalSource = archive ? recipe.source.url : details?.source;
+  $('shared-source').href = originalSource || '';
+  $('shared-source').textContent = archive ? recipe.source.label : t('출처 URL');
+  $('shared-sources').hidden = !originalSource;
+  const hasGuide = typeof guide === 'string' && guide.startsWith('https://');
+  $('shared-archive').hidden = !hasGuide;
+  if (hasGuide) $('shared-archive').href = guide;
+  $('shared-source-note').hidden = !archive || new URL(recipe.source.url).hostname === 'web.archive.org';
   $('shared-steps').replaceChildren(...recipe.steps.map(step => {
     const item = document.createElement('li');
     item.textContent = t('{volume} mL · {pour}초 붓기 · {wait}초 대기', step);
     return item;
   }));
-  requestAnimationFrame(() => drawBrewGraph($('shared-graph'), sharedRecipe.steps));
 }
-
-$('add-shared').addEventListener('click', () => addPublicRecipe(sharedRecipe));
 
 async function loadCommunityBoard() {
   const refresh = $('refresh-community');
   if (refresh.disabled) return;
+  const list = $('library-list');
   refresh.disabled = true;
-  $('community-list').replaceChildren();
-  $('community-status').textContent = t('게시판을 불러오는 중…');
+  list.setAttribute('aria-busy', 'true');
+  $('community-status').hidden = true;
   try {
     const issues = await listCommunityIssues();
-    $('community-list').replaceChildren(...issues.map(issue => {
-      const row = document.createElement('li');
-      const link = document.createElement('a');
-      const meta = document.createElement('small');
-      link.href = '#community/' + issue.number;
-      link.textContent = issue.title.replace(/^\[레시피\]\s*/, '');
-      meta.textContent = `#${issue.number} · @${issue.user?.login ?? 'ghost'} · ${t('댓글 {count}개', { count: issue.comments })}`;
-      row.append(link, meta);
-      return row;
-    }));
-    $('community-status').textContent = issues.length ? '' : t('열린 게시글이 없습니다.');
+    list.replaceChildren(...issues.map(libraryCard));
   } catch {
-    $('community-status').textContent = t('게시판을 불러오지 못했습니다. GitHub에서 볼 수 있습니다.');
+    list.replaceChildren();
+    $('community-status').textContent = t('공개 레시피를 불러오지 못했습니다.');
+    $('community-status').hidden = false;
   } finally {
+    list.setAttribute('aria-busy', 'false');
     refresh.disabled = false;
   }
 }
 
 async function loadCommunityTopic() {
-  const number = topicNumber;
+  const topic = topicNumber;
   const request = ++topicRequest;
   const current = () => request === topicRequest && route === 'community-topic';
   $('topic-content').hidden = true;
@@ -911,40 +912,38 @@ async function loadCommunityTopic() {
   $('comment-status').textContent = '';
   topicRecipe = null;
   try {
-    const issue = await getCommunityIssue(number);
+    const archiveId = topic.startsWith('archive-') ? Number(topic.slice(8)) : 0;
+    const issue = archiveId
+      ? (await listCommunityIssues()).find(item => issueRecipe(item)?.archive?.id === archiveId)
+      : await getCommunityIssue(topic);
     if (!current()) return;
     if (!issue) {
       $('topic-status').textContent = t('글이 닫혔거나 삭제되었습니다.');
       return;
     }
+    if (archiveId) {
+      history.replaceState(history.state, '', '#community/' + issue.number);
+      topicNumber = String(issue.number);
+    }
     const attachment = issueRecipe(issue);
     topicRecipe = attachment?.recipe;
-    $('community-title').textContent = issue.title.replace(/^\[레시피\]\s*/, '');
+    $('community-title').textContent = issueTitle(issue) || issue.title;
     $('topic-byline').textContent = `#${issue.number} · @${issue.user?.login ?? 'ghost'}`;
     $('topic-body').textContent = attachment?.body ?? issue.body ?? '';
-    $('topic-body').hidden = !$('topic-body').textContent;
-    $('reply-on-github').href = issueUrl(number);
+    $('topic-body').hidden = !!(attachment?.archive || attachment?.details) || !$('topic-body').textContent;
+    $('reply-on-github').href = issueUrl(issue.number);
     $('topic-recipe').hidden = !topicRecipe;
-    if (topicRecipe) {
-      const recipe = topicRecipe;
-      const { volume } = summarize(recipe.steps);
-      $('topic-recipe-name').textContent = recipe.name;
-      $('topic-recipe-settings').textContent = recipe.grounds == null
-        ? `${recipe.temperature} °C · ${volume} mL`
-        : t('{temperature} °C · {volume} mL · 원두 {grounds} g', { temperature: recipe.temperature, volume, grounds: recipe.grounds });
-      $('topic-steps').replaceChildren(...recipe.steps.map(step => {
-        const row = document.createElement('li');
-        row.textContent = t('{volume} mL · {pour}초 붓기 · {wait}초 대기', step);
-        return row;
-      }));
-    }
+    if (topicRecipe) renderSharedDetail(topicRecipe, attachment.archive, attachment.details);
     $('topic-status').textContent = '';
     $('topic-content').hidden = false;
+    if (topicRecipe) requestAnimationFrame(() => {
+      if (current() && topicRecipe) drawBrewGraph($('shared-graph'), topicRecipe.steps);
+    });
     if (!issue.comments) {
       $('comment-status').textContent = t('아직 댓글이 없습니다.');
       return;
     }
-    const comments = await listIssueComments(number);
+    const comments = await listIssueComments(issue.number);
     if (!current()) return;
     $('topic-comments').replaceChildren(...(comments ?? []).map(comment => {
       const row = document.createElement('li');
@@ -963,12 +962,34 @@ async function loadCommunityTopic() {
   }
 }
 
+function selectedPostRecipe() {
+  const value = postForm.elements.namedItem('recipe').value;
+  return value === 'draft' ? postDraft : recipes.find(recipe => recipe.id === value);
+}
+
+function updatePostRecipe() {
+  const selectedRecipe = selectedPostRecipe();
+  postForm.elements.namedItem('title').value = selectedRecipe?.name ?? '';
+  $('publish-post').disabled = !selectedRecipe;
+  $('post-attachment').hidden = !selectedRecipe;
+  if (selectedRecipe) {
+    const { volume } = summarize(selectedRecipe.steps);
+    $('post-attachment').textContent = t('{temperature} °C · {volume} mL · 추출 {count}단계', {
+      temperature: selectedRecipe.temperature, volume, count: selectedRecipe.steps.length
+    });
+  }
+}
+
 function openPost(draft) {
   postForm.reset();
-  postRecipe = draft;
-  postForm.elements.namedItem('title').value = draft?.name ?? '';
-  postForm.elements.namedItem('message').required = !draft;
-  $('post-attachment').hidden = !draft;
+  postDraft = draft;
+  const picker = postForm.elements.namedItem('recipe');
+  const options = recipes.map(recipe => new Option(recipe.name, recipe.id));
+  if (draft) options.unshift(new Option(t('편집 중인 레시피'), 'draft'));
+  picker.replaceChildren(new Option(t('레시피 선택'), ''), ...options);
+  picker.value = draft ? 'draft' : '';
+  $('post-error').hidden = true;
+  updatePostRecipe();
   postDialog.showModal();
 }
 
@@ -977,12 +998,23 @@ $('propose-recipe').addEventListener('click', () => {
   try { openPost(validateRecipe(formRecipe())); }
   catch (error) { brewer.update({ message: error.message }); }
 });
+$('new-post-recipe').addEventListener('click', () => { postDialog.close(); openSavedRecipe(''); });
+postForm.elements.namedItem('recipe').addEventListener('change', updatePostRecipe);
 postForm.addEventListener('submit', event => {
   event.preventDefault();
-  const { title, message } = postForm.elements;
-  if (!title.value.trim() || (!postRecipe && !message.value.trim())) return;
-  window.open(recipeProposalUrl(title.value, message.value, postRecipe), '_blank', 'noopener,noreferrer');
-  postDialog.close();
+  const selectedRecipe = selectedPostRecipe();
+  if (!selectedRecipe) return;
+  const { title, message, beans, grind, source } = postForm.elements;
+  try {
+    const url = recipeProposalUrl({ ...selectedRecipe, name: title.value }, {
+      beans: beans.value, grind: grind.value, description: message.value, source: source.value
+    });
+    window.open(url, '_blank', 'noopener,noreferrer');
+    postDialog.close();
+  } catch (error) {
+    $('post-error').textContent = t(error.message);
+    $('post-error').hidden = false;
+  }
 });
 $('cancel-post').addEventListener('click', () => postDialog.close());
 $('refresh-community').addEventListener('click', loadCommunityBoard);
@@ -992,7 +1024,7 @@ window.addEventListener('focus', () => {
   if (route === 'community-topic') void loadCommunityTopic();
 });
 new ResizeObserver(() => {
-  if (sharedRecipe && !$('shared-detail').hidden) drawBrewGraph($('shared-graph'), sharedRecipe.steps);
+  if (topicRecipe && route === 'community-topic') drawBrewGraph($('shared-graph'), topicRecipe.steps);
 }).observe($('shared-graph'));
 bindReorder($('saved-cards'), reorderRecipe);
 bindReorder($('steps'), (from, to) => {
@@ -1152,7 +1184,6 @@ function applyLanguage(value) {
   $('language').value = language;
   translatePage();
   renderCompatibility();
-  renderLibrary();
   refreshOptions();
   for (const label of $('steps').querySelectorAll('[data-step-label]')) {
     label.firstChild.nodeValue = t(label.dataset.stepLabel);

@@ -1,8 +1,8 @@
-const CACHE = 'smart7-offline-v12';
+const CACHE = 'smart7-offline-v13';
 const assets = [
   './', './index.html', './style.css', './app.js', './protocol.js', './recipes.js', './app.webmanifest',
-  './coffee.webp', './icon-192.png', './icon-512.png', './recipe-library.js', './brew-graph.js', './i18n.js',
-  './recipe-photo.js', './reorder.js', './recipe-details.js',
+  './coffee.webp', './icon-192.png', './icon-512.png', './brew-graph.js', './i18n.js',
+  './recipe-photo.js', './reorder.js', './recipe-photos.js',
   './reference-v60.jpg', './reference-cup.jpg', './reference-iced.jpg',
   './community-recipes.js'
 ].map(path => new URL(path, self.registration.scope).href);

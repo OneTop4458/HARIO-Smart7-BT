@@ -169,17 +169,12 @@
 
     <section id="library" class="screen" aria-labelledby="library-title" hidden>
       <div class="section-head"><h2 id="library-title" tabindex="-1">공개 레시피</h2></div>
-      <section class="community-board" aria-labelledby="board-title">
-        <h3 id="board-title">커뮤니티 게시판</h3>
-        <div class="recipe-actions">
-          <button class="secondary" type="button" id="new-community-post">새 글 작성</button>
-          <button class="quiet" type="button" id="refresh-community">새로고침</button>
-          <a class="quiet" href="https://github.com/OneTop4458/smart7-offline/issues?q=is%3Aissue%20is%3Aopen%20label%3Arecipe" target="_blank" rel="noopener noreferrer">GitHub 게시판</a>
-        </div>
-        <p id="community-status" class="micro" role="status"></p>
-        <ul id="community-list" class="post-list"></ul>
-      </section>
-      <ul class="recipe-cards" id="library-list"></ul>
+      <div class="recipe-actions library-actions">
+        <button class="secondary" type="button" id="new-community-post">레시피 공유</button>
+        <button class="quiet" type="button" id="refresh-community">새로고침</button>
+      </div>
+      <p id="community-status" class="micro" role="status" hidden></p>
+      <ul class="recipe-cards" id="library-list" aria-busy="false"></ul>
     </section>
 
     <article id="community-topic" class="screen" aria-labelledby="community-title" hidden>
@@ -188,11 +183,24 @@
       <div id="topic-content" hidden>
         <p id="topic-byline" class="micro"></p>
         <p id="topic-body" class="post-text"></p>
-        <section id="topic-recipe" class="summary" hidden>
-          <h3 id="topic-recipe-name"></h3>
-          <p id="topic-recipe-settings"></p>
-          <ol id="topic-steps"></ol>
-          <button id="save-topic-recipe" class="secondary" type="button">내 레시피로 저장</button>
+        <section id="topic-recipe" class="shared-layout" aria-label="추출 설정" hidden>
+          <div>
+            <figure class="shared-photo">
+              <img id="shared-photo" width="1080" height="720" alt="">
+              <figcaption><span>참고 사진</span> · <a id="shared-photo-credit" class="source-link" target="_blank" rel="noopener noreferrer"></a> · <a id="shared-photo-license" class="source-link" target="_blank" rel="noopener noreferrer"></a> · <span>축소본</span></figcaption>
+            </figure>
+            <p id="shared-description" hidden></p>
+            <p class="micro" id="shared-grinder" hidden></p>
+            <dl id="shared-values"></dl>
+            <p class="shared-sources" id="shared-sources" hidden><a id="shared-source" class="source-link" target="_blank" rel="noopener noreferrer"></a><a id="shared-archive" class="source-link" target="_blank" rel="noopener noreferrer" hidden>HARIO 공식 안내 보존본</a></p>
+            <p id="shared-source-note" class="micro" hidden>공유 사이트가 종료되어 원문 주소는 종료 안내로 연결될 수 있습니다.</p>
+            <button id="save-topic-recipe" class="primary" type="button">내 레시피로 저장</button>
+          </div>
+          <div class="summary">
+            <h3>추출 그래프</h3>
+            <canvas id="shared-graph" role="img" aria-label="레시피의 시간별 누적 물량 그래프"></canvas>
+            <ol id="shared-steps"></ol>
+          </div>
         </section>
         <div class="section-head">
           <h3>댓글</h3>
@@ -203,47 +211,35 @@
       </div>
     </article>
 
-    <article id="shared-detail" class="screen" aria-labelledby="shared-title" hidden>
-      <div class="section-head"><h2 id="shared-title" tabindex="-1"></h2></div>
-      <div class="shared-layout">
-        <div>
-          <figure class="shared-photo">
-            <img id="shared-photo" width="1080" height="720" alt="">
-            <figcaption><span>참고 사진</span> · <a id="shared-photo-credit" class="source-link" target="_blank" rel="noopener noreferrer"></a> · <a id="shared-photo-license" class="source-link" target="_blank" rel="noopener noreferrer"></a> · <span>축소본</span></figcaption>
-          </figure>
-          <p id="shared-description"></p>
-          <p class="micro" id="shared-grinder"></p>
-          <dl id="shared-values"></dl>
-          <p class="shared-sources"><a id="shared-source" class="source-link" target="_blank" rel="noopener noreferrer"></a><a id="shared-archive" class="source-link" href="https://web.archive.org/web/20241204085400/https://smart7.jp/tips.html" target="_blank" rel="noopener noreferrer" hidden>HARIO 공식 안내 보존본</a></p>
-          <p id="shared-source-note" class="micro">공유 사이트가 종료되어 원문 주소는 종료 안내로 연결될 수 있습니다.</p>
-          <button type="button" id="add-shared" class="primary">내 레시피로 저장</button>
-        </div>
-        <div class="summary">
-          <h3>추출 그래프</h3>
-          <canvas id="shared-graph" role="img" aria-label="레시피의 시간별 누적 물량 그래프"></canvas>
-          <ol id="shared-steps"></ol>
-        </div>
-      </div>
-    </article>
     <p class="notice" id="notice" role="status" aria-live="polite" hidden></p>
   </main>
 
   <footer id="footer" class="wrap footer">
-    <span>Smart7 · 0.1.0-beta.1</span>
+    <span>Smart7 · 0.1.0-beta.2</span>
     <div><a href="./EVS-70SV-BT-manual.pdf" target="_blank" rel="noopener noreferrer">본체 설명서</a><a href="https://github.com/OneTop4458/smart7-offline" rel="noopener">GitHub</a></div>
     <small lang="en">Unofficial community project for HARIO Smart7.</small>
   </footer>
 
   <dialog id="post-dialog" aria-labelledby="post-title">
-    <h2 id="post-title">새 글 작성</h2>
+    <h2 id="post-title">레시피 공유</h2>
     <p class="micro">GitHub에 로그인한 뒤 공개 게시를 완료하세요.</p>
     <form id="post-form">
-      <label>제목 <input name="title" maxlength="60" required></label>
-      <label>내용 <textarea name="message" rows="5" maxlength="450"></textarea></label>
-      <p id="post-attachment" class="micro" hidden>레시피의 추출 설정이 첨부됩니다.</p>
+      <div class="form-row saved-row">
+        <label>공유할 레시피 <select name="recipe" required></select></label>
+        <button class="quiet" type="button" id="new-post-recipe">새로 만들기</button>
+      </div>
+      <p id="post-attachment" class="micro" hidden></p>
+      <label>레시피 이름 <input name="title" maxlength="60" required></label>
+      <div class="form-row">
+        <label>원두 <input name="beans" maxlength="60" placeholder="선택"></label>
+        <label>분쇄도 <input name="grind" maxlength="30" placeholder="선택"></label>
+      </div>
+      <label>추출 메모 <textarea name="message" rows="3" maxlength="180"></textarea></label>
+      <label>출처 URL <input name="source" type="url" pattern="https://.+" maxlength="250" placeholder="선택"></label>
+      <p id="post-error" class="error" role="status" hidden></p>
       <div class="dialog-actions">
         <button class="quiet" type="button" id="cancel-post">취소</button>
-        <button class="primary" type="submit">GitHub에서 게시</button>
+        <button class="primary" type="submit" id="publish-post">GitHub에서 게시</button>
       </div>
     </form>
   </dialog>

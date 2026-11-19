@@ -157,12 +157,10 @@ body[data-screen=operation] .brew .schedule { order: 1; margin: 0; }
 .footer a { text-decoration: underline; text-underline-offset: .2em; }
 .footer a + a { margin-left: 12px; }
 .footer small { flex-basis: 100%; font-size: .72rem; }
-.community-board { margin-bottom: 22px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
-.community-board h3, #topic-recipe h3 { margin: 0 0 10px; }
+.library-actions { margin-bottom: 12px; }
+.discussion-card { min-height: 85px; padding: 10px 0; }
 .post-list { list-style: none; margin: 0; padding: 0; }
 .post-list li { padding: 9px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
-.post-list a { display: block; font-weight: 650; }
-.post-list small { color: var(--muted); }
 .post-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 #community-title { overflow-wrap: anywhere; }
 #post-form label { display: block; margin-bottom: 10px; }
@@ -203,7 +201,7 @@ dialog .check { display: flex; align-items: center; gap: 8px; margin-top: 10px; 
 .shared-sources { display: flex; flex-wrap: wrap; gap: 7px 16px; }
 .shared-layout h3 { margin: 0 0 8px; }
 #shared-steps { padding-left: 1.3em; color: var(--muted); font-size: .87rem; }
-#add-shared { min-height: 48px; }
+#save-topic-recipe { min-height: 48px; }
 
 @media (max-width: 800px) {
   .wrap { width: calc(100% - 32px); }
