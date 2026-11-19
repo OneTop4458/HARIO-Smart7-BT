@@ -30,10 +30,13 @@ const phaseLabels = {
   complete: '완료', draining: '배수 중', 'checking-clean': '상태 확인 중', cleaning: '세척 중',
   soaking: '세척 대기', 'awaiting-rinse': '헹굼 준비', rinsing: '헹굼 중'
 };
-const supported = window.isSecureContext && !!navigator.bluetooth;
-$('compatibility').textContent = supported
-  ? '기기 선택 창에서 EVS-70을 선택하세요.'
-  : '블루투스 연결은 HTTPS에서 Android 또는 데스크톱 Chrome을 사용하세요.';
+const appleMobile = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const android = navigator.userAgentData?.platform === 'Android' || /Android/i.test(navigator.userAgent);
+const supported = !appleMobile && window.isSecureContext && !!navigator.bluetooth;
+if (appleMobile) $('compatibility').textContent = 'Smart7 본체를 연결하려면 Android Chrome으로 접속해 주세요.';
+else if (!supported) $('compatibility').textContent = '블루투스 연결은 HTTPS에서 Android 또는 데스크톱 Chrome을 사용하세요.';
+else if (android) $('compatibility').textContent = '권한 요청이 나오면 허용하고 기기 선택 창에서 EVS-70을 선택하세요.';
 
 function formRecipe() {
   if (mode === 'auto') {
@@ -343,3 +346,11 @@ if ('serviceWorker' in navigator) {
 
 loadRecipe('');
 render(brewer.state);
+
+if (appleMobile || android) {
+  $('platform-title').textContent = appleMobile ? 'iPhone·iPad 연결 미지원' : '블루투스 권한을 허용해 주세요';
+  $('platform-message').textContent = appleMobile
+    ? 'iPhone과 iPad에서는 Smart7 본체에 연결할 수 없습니다. Android 기기의 Chrome에서 이 주소를 다시 열어 주세요.'
+    : 'Android Chrome에서 블루투스를 켠 뒤 BT 연결을 눌러 주세요. 블루투스 또는 주변 기기 권한을 묻는 창이 나오면 허용해 주세요.';
+  $('platform-dialog').showModal();
+}
