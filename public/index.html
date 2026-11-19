@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#20262d">
   <meta name="description" content="HARIO Smart7 BT를 블루투스로 연결해 추출을 제어하는 웹앱.">
-  <title>스마트 세븐</title>
+  <title>Smart7</title>
   <link rel="icon" href="./icon-192.png">
   <link rel="apple-touch-icon" href="./icon-192.png">
   <link rel="manifest" href="./app.webmanifest">
@@ -15,7 +15,7 @@
 <body>
   <header class="site-header wrap" id="top">
     <button type="button" class="quiet back-button" id="back" aria-label="뒤로" hidden>‹</button>
-    <div class="wordmark"><span class="mark" aria-hidden="true"></span><span>스마트 세븐</span></div>
+    <div class="wordmark"><span class="mark" aria-hidden="true"></span><span>Smart7</span></div>
     <div class="header-actions">
       <button type="button" id="connect" class="primary" aria-label="Smart7 연결"><span class="bt-label" aria-hidden="true">BT</span> 연결</button>
       <button type="button" id="reconnect" class="quiet" hidden>다시 연결</button>
@@ -25,7 +25,7 @@
   </header>
 
   <main class="wrap">
-    <h1 class="sr-only">스마트 세븐</h1>
+    <h1 class="sr-only">Smart7</h1>
     <div class="device-strip">
       <span class="model">EVS-70SV-BT</span>
       <span class="connection-label"><i id="connection-dot" aria-hidden="true"></i><span id="connection" role="status">연결 안 됨</span></span>
@@ -101,6 +101,7 @@
               <button type="submit" class="secondary">저장</button>
               <label class="quiet file-label">JSON 가져오기<input id="import-recipes" type="file" accept=".json,application/json"></label>
               <button type="button" class="quiet" id="export-recipe">이 레시피 내보내기</button>
+              <button type="button" class="quiet" id="propose-recipe">GitHub에 레시피 제안</button>
               <button type="button" class="quiet" id="export-recipes">전체 내보내기</button>
               <button type="button" class="quiet" id="copy-recipe" hidden>복제</button>
               <button type="button" class="quiet" id="replace-recipe" hidden>다른 레시피에 덮어쓰기</button>
@@ -168,8 +169,39 @@
 
     <section id="library" class="screen" aria-labelledby="library-title" hidden>
       <div class="section-head"><h2 id="library-title" tabindex="-1">공개 레시피</h2></div>
+      <section class="community-board" aria-labelledby="board-title">
+        <h3 id="board-title">커뮤니티 게시판</h3>
+        <div class="recipe-actions">
+          <button class="secondary" type="button" id="new-community-post">새 글 작성</button>
+          <button class="quiet" type="button" id="refresh-community">새로고침</button>
+          <a class="quiet" href="https://github.com/OneTop4458/smart7-offline/issues?q=is%3Aissue%20is%3Aopen%20label%3Arecipe" target="_blank" rel="noopener noreferrer">GitHub 게시판</a>
+        </div>
+        <p id="community-status" class="micro" role="status"></p>
+        <ul id="community-list" class="post-list"></ul>
+      </section>
       <ul class="recipe-cards" id="library-list"></ul>
     </section>
+
+    <article id="community-topic" class="screen" aria-labelledby="community-title" hidden>
+      <div class="section-head"><h2 id="community-title" tabindex="-1"></h2></div>
+      <p id="topic-status" class="micro" role="status"></p>
+      <div id="topic-content" hidden>
+        <p id="topic-byline" class="micro"></p>
+        <p id="topic-body" class="post-text"></p>
+        <section id="topic-recipe" class="summary" hidden>
+          <h3 id="topic-recipe-name"></h3>
+          <p id="topic-recipe-settings"></p>
+          <ol id="topic-steps"></ol>
+          <button id="save-topic-recipe" class="secondary" type="button">내 레시피로 저장</button>
+        </section>
+        <div class="section-head">
+          <h3>댓글</h3>
+          <a id="reply-on-github" class="quiet" target="_blank" rel="noopener noreferrer">GitHub에서 댓글 쓰기</a>
+        </div>
+        <p id="comment-status" class="micro" role="status"></p>
+        <ul id="topic-comments" class="post-list"></ul>
+      </div>
+    </article>
 
     <article id="shared-detail" class="screen" aria-labelledby="shared-title" hidden>
       <div class="section-head"><h2 id="shared-title" tabindex="-1"></h2></div>
@@ -196,7 +228,25 @@
     <p class="notice" id="notice" role="status" aria-live="polite" hidden></p>
   </main>
 
-  <footer id="footer" class="wrap footer"><span>스마트 세븐 · 베타 0.0.1</span><div><a href="./EVS-70SV-BT-manual.pdf" target="_blank" rel="noopener noreferrer">본체 설명서</a><a href="https://github.com/OneTop4458/smart7-offline" rel="noopener">GitHub</a></div></footer>
+  <footer id="footer" class="wrap footer">
+    <span>Smart7 · 0.1.0-beta.1</span>
+    <div><a href="./EVS-70SV-BT-manual.pdf" target="_blank" rel="noopener noreferrer">본체 설명서</a><a href="https://github.com/OneTop4458/smart7-offline" rel="noopener">GitHub</a></div>
+    <small lang="en">Unofficial community project for HARIO Smart7.</small>
+  </footer>
+
+  <dialog id="post-dialog" aria-labelledby="post-title">
+    <h2 id="post-title">새 글 작성</h2>
+    <p class="micro">GitHub에 로그인한 뒤 공개 게시를 완료하세요.</p>
+    <form id="post-form">
+      <label>제목 <input name="title" maxlength="60" required></label>
+      <label>내용 <textarea name="message" rows="5" maxlength="450"></textarea></label>
+      <p id="post-attachment" class="micro" hidden>레시피의 추출 설정이 첨부됩니다.</p>
+      <div class="dialog-actions">
+        <button class="quiet" type="button" id="cancel-post">취소</button>
+        <button class="primary" type="submit">GitHub에서 게시</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="platform-dialog" aria-labelledby="platform-title" aria-describedby="platform-message">
     <form method="dialog">

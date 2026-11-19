@@ -1,6 +1,7 @@
 import { automaticRecipe, parseRecipeFile, summarize, validateRecipe } from './recipes.js';
 import { publicRecipeId, publicRecipes } from './recipe-library.js';
 import { publicDetails, recipePhoto } from './recipe-details.js';
+import { getCommunityIssue, issueRecipe, issueUrl, listCommunityIssues, listIssueComments, recipeProposalUrl } from './community-recipes.js';
 import { Smart7, workingPhases } from './protocol.js';
 import { drawBrewGraph } from './brew-graph.js';
 import { localizeStatic, setLanguage, t } from './i18n.js';
@@ -19,12 +20,18 @@ const waterDialog = $('water-dialog');
 const cleanGuide = $('clean-guide');
 const switchDialog = $('switch-dialog');
 const overwriteDialog = $('overwrite-dialog');
+const postDialog = $('post-dialog');
+const postForm = $('post-form');
 const translatePage = localizeStatic(document.body);
 const storageKey = 'smart7-recipes';
 let mode = 'auto';
 let route = 'home';
 let shownScreen = '';
 let sharedRecipe;
+let postRecipe;
+let topicNumber;
+let topicRequest = 0;
+let topicRecipe;
 let selected = '';
 let lastPreview = '';
 let activeRecipe;
@@ -73,7 +80,7 @@ const appleMobile = /iPhone|iPad|iPod/i.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const android = navigator.userAgentData?.platform === 'Android' || /Android/i.test(navigator.userAgent);
 const supported = !appleMobile && window.isSecureContext && !!navigator.bluetooth;
-const screenParents = { auto: 'home', recipes: 'home', editor: 'recipes', library: 'home', 'shared-detail': 'library', maintenance: 'home' };
+const screenParents = { auto: 'home', recipes: 'home', editor: 'recipes', library: 'home', 'shared-detail': 'library', 'community-topic': 'library', maintenance: 'home' };
 const sections = [...document.querySelectorAll('.screen')];
 const listScroll = new Map();
 
@@ -117,7 +124,11 @@ function applyRoute() {
   }
   const id = hash.startsWith('shared/') ? Number(hash.slice(7)) : 0;
   const detail = id && publicRecipes.find(recipe => publicRecipeId(recipe) === id);
-  const next = detail ? 'shared-detail' : Object.hasOwn(screenParents, hash) && hash !== 'shared-detail' ? hash : 'home';
+  const number = /^community\/([1-9]\d*)$/.exec(hash)?.[1];
+  const next = detail ? 'shared-detail' : number ? 'community-topic'
+    : Object.hasOwn(screenParents, hash) && !['shared-detail', 'community-topic'].includes(hash) ? hash : 'home';
+  const enteringBoard = next === 'library' && route !== 'library';
+  const enteringTopic = next === 'community-topic' && (route !== next || topicNumber !== number);
   if (route === 'maintenance' && next !== route) {
     $('flow-tools').open = false;
     brewer.showCalibration(false);
@@ -130,6 +141,11 @@ function applyRoute() {
     renderSharedDetail();
   }
   render(brewer.state);
+  if (enteringBoard) void loadCommunityBoard();
+  if (enteringTopic) {
+    topicNumber = number;
+    void loadCommunityTopic();
+  }
 }
 
 function go(hash, replace = false) {
@@ -857,6 +873,124 @@ function renderSharedDetail() {
 }
 
 $('add-shared').addEventListener('click', () => addPublicRecipe(sharedRecipe));
+
+async function loadCommunityBoard() {
+  const refresh = $('refresh-community');
+  if (refresh.disabled) return;
+  refresh.disabled = true;
+  $('community-list').replaceChildren();
+  $('community-status').textContent = t('게시판을 불러오는 중…');
+  try {
+    const issues = await listCommunityIssues();
+    $('community-list').replaceChildren(...issues.map(issue => {
+      const row = document.createElement('li');
+      const link = document.createElement('a');
+      const meta = document.createElement('small');
+      link.href = '#community/' + issue.number;
+      link.textContent = issue.title.replace(/^\[레시피\]\s*/, '');
+      meta.textContent = `#${issue.number} · @${issue.user?.login ?? 'ghost'} · ${t('댓글 {count}개', { count: issue.comments })}`;
+      row.append(link, meta);
+      return row;
+    }));
+    $('community-status').textContent = issues.length ? '' : t('열린 게시글이 없습니다.');
+  } catch {
+    $('community-status').textContent = t('게시판을 불러오지 못했습니다. GitHub에서 볼 수 있습니다.');
+  } finally {
+    refresh.disabled = false;
+  }
+}
+
+async function loadCommunityTopic() {
+  const number = topicNumber;
+  const request = ++topicRequest;
+  const current = () => request === topicRequest && route === 'community-topic';
+  $('topic-content').hidden = true;
+  $('community-title').textContent = t('커뮤니티 게시글');
+  $('topic-status').textContent = t('게시판을 불러오는 중…');
+  $('topic-comments').replaceChildren();
+  $('comment-status').textContent = '';
+  topicRecipe = null;
+  try {
+    const issue = await getCommunityIssue(number);
+    if (!current()) return;
+    if (!issue) {
+      $('topic-status').textContent = t('글이 닫혔거나 삭제되었습니다.');
+      return;
+    }
+    const attachment = issueRecipe(issue);
+    topicRecipe = attachment?.recipe;
+    $('community-title').textContent = issue.title.replace(/^\[레시피\]\s*/, '');
+    $('topic-byline').textContent = `#${issue.number} · @${issue.user?.login ?? 'ghost'}`;
+    $('topic-body').textContent = attachment?.body ?? issue.body ?? '';
+    $('topic-body').hidden = !$('topic-body').textContent;
+    $('reply-on-github').href = issueUrl(number);
+    $('topic-recipe').hidden = !topicRecipe;
+    if (topicRecipe) {
+      const recipe = topicRecipe;
+      const { volume } = summarize(recipe.steps);
+      $('topic-recipe-name').textContent = recipe.name;
+      $('topic-recipe-settings').textContent = recipe.grounds == null
+        ? `${recipe.temperature} °C · ${volume} mL`
+        : t('{temperature} °C · {volume} mL · 원두 {grounds} g', { temperature: recipe.temperature, volume, grounds: recipe.grounds });
+      $('topic-steps').replaceChildren(...recipe.steps.map(step => {
+        const row = document.createElement('li');
+        row.textContent = t('{volume} mL · {pour}초 붓기 · {wait}초 대기', step);
+        return row;
+      }));
+    }
+    $('topic-status').textContent = '';
+    $('topic-content').hidden = false;
+    if (!issue.comments) {
+      $('comment-status').textContent = t('아직 댓글이 없습니다.');
+      return;
+    }
+    const comments = await listIssueComments(number);
+    if (!current()) return;
+    $('topic-comments').replaceChildren(...(comments ?? []).map(comment => {
+      const row = document.createElement('li');
+      const author = document.createElement('strong');
+      const body = document.createElement('p');
+      author.textContent = '@' + (comment.user?.login ?? 'ghost');
+      body.className = 'post-text';
+      body.textContent = comment.body;
+      row.append(author, body);
+      return row;
+    }));
+  } catch {
+    if (!current()) return;
+    const status = $('topic-content').hidden ? $('topic-status') : $('comment-status');
+    status.textContent = t('게시판을 불러오지 못했습니다. GitHub에서 볼 수 있습니다.');
+  }
+}
+
+function openPost(draft) {
+  postForm.reset();
+  postRecipe = draft;
+  postForm.elements.namedItem('title').value = draft?.name ?? '';
+  postForm.elements.namedItem('message').required = !draft;
+  $('post-attachment').hidden = !draft;
+  postDialog.showModal();
+}
+
+$('new-community-post').addEventListener('click', () => openPost());
+$('propose-recipe').addEventListener('click', () => {
+  try { openPost(validateRecipe(formRecipe())); }
+  catch (error) { brewer.update({ message: error.message }); }
+});
+postForm.addEventListener('submit', event => {
+  event.preventDefault();
+  const { title, message } = postForm.elements;
+  if (!title.value.trim() || (!postRecipe && !message.value.trim())) return;
+  window.open(recipeProposalUrl(title.value, message.value, postRecipe), '_blank', 'noopener,noreferrer');
+  postDialog.close();
+});
+$('cancel-post').addEventListener('click', () => postDialog.close());
+$('refresh-community').addEventListener('click', loadCommunityBoard);
+$('save-topic-recipe').addEventListener('click', () => addPublicRecipe(topicRecipe));
+window.addEventListener('focus', () => {
+  if (route === 'library') void loadCommunityBoard();
+  if (route === 'community-topic') void loadCommunityTopic();
+});
 new ResizeObserver(() => {
   if (sharedRecipe && !$('shared-detail').hidden) drawBrewGraph($('shared-graph'), sharedRecipe.steps);
 }).observe($('shared-graph'));
@@ -1015,7 +1149,6 @@ if ('serviceWorker' in navigator) {
 function applyLanguage(value) {
   const language = setLanguage(value);
   document.documentElement.lang = language;
-  document.title = t('스마트 세븐');
   $('language').value = language;
   translatePage();
   renderCompatibility();

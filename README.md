@@ -1,23 +1,21 @@
-# Smart7 (스마트 세븐)
+# Smart7
 
-HARIO V60 Auto Pour Over Smart7 BT (`EVS-70SV-BT`)용 커뮤니티 웹앱입니다. BLE로 본체를 연결해 자동 모드와 내 레시피를 실행합니다. 정적 파일로 배포하며 레시피와 연결 환경설정은 브라우저에 저장합니다.
+HARIO Smart7 BT (`EVS-70SV-BT`)를 블루투스로 제어하는 비공식 웹앱입니다.
 
-## 사용하기
+[웹앱 열기](https://smart7-offline.vercel.app/) · [설명서 PDF](https://smart7-offline.vercel.app/EVS-70SV-BT-manual.pdf) · [커뮤니티 게시판](https://github.com/OneTop4458/smart7-offline/issues?q=is%3Aissue%20is%3Aopen%20label%3Arecipe)
 
-1. Android Chrome 또는 BLE를 지원하는 데스크톱 Chrome에서 HTTPS 배포 주소를 엽니다.
-2. 지원 브라우저에서는 설치 버튼이나 Chrome의 앱 설치 메뉴를 사용할 수 있습니다.
-3. **Smart7 연결**을 눌러 목록에서 `EVS-70`이 포함된 이름을 선택하고 본체에 표시되는 6자리 PIN을 입력합니다.
-4. 드리퍼, 서버와 물을 준비하고 자동 모드 또는 내 레시피에서 추출을 시작합니다. 동작 중 본체 가까이에서 상태를 확인하세요. 브라우저가 연결을 잃으면 본체에서 진행 상태를 확인하고 필요하면 본체 버튼으로 중지하세요.
+## 시작하기
 
-- iPhone·iPad에서는 본체 연결을 지원하지 않습니다. Android Chrome에서 연결 중 블루투스 또는 주변 기기 권한 요청이 나오면 허용하세요.
-- **공개 레시피**에서 카스야 테츠 4:6, HARIO 공식 변형, 모모스커피와 Calibre 등의 설정 19종을 내 레시피에 추가할 수 있습니다. 사진 카드의 상세 화면에서 원두, 분쇄도, 추출 단계, 그래프와 출처를 확인할 수 있습니다. 예전 Smart7 공유 페이지에서 확인한 값을 앱에 포함했고, No.1061은 [Wayback 원본](https://web.archive.org/web/20240226122051/https://smart7.jp/detail.php?recipe_no=1061)을 연결했습니다. No.1061의 예상 시간은 원본 단계표에 적힌 마지막 대기 20초를 포함합니다. 일부 원본 링크는 서버 종료 안내로 연결될 수 있습니다.
-- **내 레시피**에서 한 레시피 또는 전체를 JSON으로 내보낼 수 있습니다. 기존 Smart7 Offline 백업, 단일 레시피 JSON, 구형 HARIO 앱의 공유 레시피 상세 JSON을 가져올 수 있습니다. 이름·온도·원두량·추출 단계가 모두 같은 레시피는 한 번만 저장됩니다.
-- **추출 그래프**는 단계별 설정에서 계산한 시간과 누적 물량을 보여줍니다. 추출 중 표시되는 위치는 본체의 남은 시간을 기준으로 계산합니다.
-- **내 레시피**에 카메라나 사진 파일을 추가할 수 있습니다. 사진은 256×256 JPEG로 잘라 브라우저에 저장하며 JSON 백업에 포함합니다. **기기 관리 → 언어**에서 한국어, 일본어, 영어를 선택할 수 있습니다.
-- **내 레시피**에서는 사진 카드와 붓기 단계의 손잡이를 끌어서 순서를 바꿀 수 있습니다. 첫 뜸들이기 단계는 고정됩니다. 사진 저장 전에 확대와 자를 위치를 조절할 수 있습니다. 자동 모드는 잔 수별로 온도와 속도를 기억하며 설정을 새 레시피로 저장하거나 기존 레시피에 덮어쓸 수 있습니다.
-- 과열 신호가 오면 추출을 중지하고 배수 화면으로 갈 수 있습니다. 실제 배수는 그 화면에서 시작을 확인해야 합니다. 추출 전 잔수 확인, 세척 준비 단계, 유량 자동 조회와 1–9단 조절, 추출 완료 요약 및 저장된 기기의 별칭·전환을 제공합니다. 헹굼 완료 화면은 본체의 헹굼 진행 신호부터 45초 뒤에 표시됩니다.
-- APK 1.0.6에서 관찰한 BLE 통신을 기준으로 구현했습니다. 가상 GATT와 앱 흐름 테스트를 제공하며 실제 본체에서의 동작은 확인이 필요합니다.
-- [HARIO 서비스 종료 공지](https://shop.hario.co.jp/smart7.html) · [Smart7 BT 본체 설명서 PDF](https://smart7-offline.vercel.app/EVS-70SV-BT-manual.pdf)
+Android Chrome에서 **BT 연결**을 누르고 본체에 표시된 6자리 PIN을 입력하세요. Web Bluetooth를 지원하는 데스크톱 Chrome에서도 연결할 수 있습니다. iPhone·iPad에서는 레시피를 둘러볼 수 있습니다.
+
+- **자동 모드**와 **내 레시피**에서 추출을 시작할 수 있습니다. 내 레시피는 사진과 함께 저장하고 JSON으로 백업할 수 있습니다.
+- **공개 레시피**에는 예전 공유 레시피 19종과 실시간 커뮤니티 게시판이 있습니다.
+
+## 커뮤니티
+
+공개 레시피에서 새 글을 작성하거나 내 레시피에서 추출 설정을 첨부할 수 있습니다. GitHub에서 로그인하고 게시하면 열린 이슈가 웹앱에 표시됩니다. 글과 댓글은 웹앱에서 읽고, 답글은 GitHub에서 작성합니다.
+
+운영자는 GitHub에서 이슈를 닫아 게시판에서 숨길 수 있습니다. 목록을 새로고침하면 반영됩니다.
 
 ## 개발
 
@@ -26,17 +24,8 @@ npm test
 python -m http.server 8080 --directory public
 ```
 
-`http://localhost:8080`에서 엽니다. 정적 배포의 출력 디렉터리는 `public/`입니다. BLE 연결은 브라우저 보안 컨텍스트와 사용자의 기기 선택을 요구합니다.
+[localhost:8080](http://localhost:8080)에서 엽니다. `main`에 반영하면 Vercel이 배포합니다.
 
-Vercel 프로젝트는 GitHub 저장소에 연결돼 있습니다. `main` 브랜치의 푸시가 운영 배포를 시작합니다. 앱은 정적 CDN으로 제공됩니다.
+## 라이선스
 
-- `public/protocol.js`는 GATT 세션, 패킷 인코딩과 추출 상태를 처리합니다.
-- `public/recipes.js`는 자동 레시피와 입력 한도를 정의합니다.
-- `public/recipe-library.js`는 확인한 공개 레시피의 설정값과 개별 출처를 담습니다.
-- `public/sw.js`는 오프라인 사용에 필요한 앱 파일을 캐시합니다.
-
-독립 프로젝트이며 HARIO가 운영하거나 보증하는 서비스가 아닙니다. 웹앱은 새 UI와 코드를 사용하며 원본 APK를 재배포하지 않습니다. 홈 사진은 ImageGen으로 생성했습니다. 공개 레시피에 표시되는 참고 사진은 아래의 Wikimedia Commons 축소본입니다.
-
-- [Coffee pour over using Hario cone](https://commons.wikimedia.org/wiki/File:Coffee_pour_over_using_Hario_cone.jpg) · GorillaWarfare · [CC BY-SA 1.0](https://creativecommons.org/licenses/by-sa/1.0/)
-- [Cup and coffee beans](https://commons.wikimedia.org/wiki/File:Cup_and_coffee_beans.JPG) · Martin Falbisoner · [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/)
-- [Iced cold brew coffee](https://commons.wikimedia.org/wiki/File:Iced_cold_brew_coffee.jpg) · roland · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
+프로젝트 코드는 [MIT](LICENSE)입니다. 사진과 HARIO 자료의 출처 및 이용 조건은 [제3자 자료 안내](THIRD_PARTY_NOTICES.md)를 참고하세요.

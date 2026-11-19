@@ -156,6 +156,17 @@ body[data-screen=operation] .brew .schedule { order: 1; margin: 0; }
 .footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 14px 0 36px; color: var(--muted); font-size: .82rem; }
 .footer a { text-decoration: underline; text-underline-offset: .2em; }
 .footer a + a { margin-left: 12px; }
+.footer small { flex-basis: 100%; font-size: .72rem; }
+.community-board { margin-bottom: 22px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.community-board h3, #topic-recipe h3 { margin: 0 0 10px; }
+.post-list { list-style: none; margin: 0; padding: 0; }
+.post-list li { padding: 9px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.post-list a { display: block; font-weight: 650; }
+.post-list small { color: var(--muted); }
+.post-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+#community-title { overflow-wrap: anywhere; }
+#post-form label { display: block; margin-bottom: 10px; }
+#post-form textarea { display: block; width: 100%; margin-top: 5px; padding: 8px; border-radius: 5px; background: var(--dark); border: 1px solid var(--line); color: var(--ink); font: inherit; resize: vertical; }
 
 dialog { width: min(440px, 100% - 32px); border: 1px solid var(--line); border-radius: 12px; padding: 23px; background: var(--surface); color: var(--ink); }
 dialog::backdrop { background: #0b1118c5; }
