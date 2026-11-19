@@ -1,4 +1,4 @@
-const CACHE = 'smart7-offline-v4';
+const CACHE = 'smart7-offline-v5';
 const assets = [
   './', './index.html', './style.css', './app.js', './protocol.js', './recipes.js', './app.webmanifest',
   './coffee.webp', './icon-192.png', './icon-512.png', './recipe-library.js'
@@ -19,18 +19,20 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   const { request } = event;
-  if (request.method !== 'GET' || !assets.includes(request.url)) return;
+  const url = new URL(request.url);
+  url.hash = '';
+  if (request.method !== 'GET' || !assets.includes(url.href)) return;
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     try {
       const response = await fetch(request, { cache: 'no-cache', signal: AbortSignal.timeout(2500) });
       if (response.ok) {
-        await cache.put(request, response.clone());
+        await cache.put(url.href, response.clone());
         return response;
       }
-      return await cache.match(request) || response;
+      return await cache.match(url.href) || response;
     } catch {
-      return await cache.match(request) || Response.error();
+      return await cache.match(url.href) || Response.error();
     }
   })());
 });

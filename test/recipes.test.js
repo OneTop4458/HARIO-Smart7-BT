@@ -6,7 +6,9 @@ import { automaticRecipe, parseRecipeFile, summarize, validateRecipe } from '../
 test('public recipes match the published totals and fit the brew validator', () => {
   const expected = {
     1055: [300, 208], 1069: [410, 83], 1070: [410, 163], 1072: [330, 108],
-    1071: [520, 108], 1065: [270, 93], 1197: [300, 137], 1228: [270, 135]
+    1071: [520, 108], 1065: [270, 93], 1197: [300, 137], 1228: [270, 135],
+    1061: [300, 172], 1257: [270, 121], 1277: [300, 340], 1283: [310, 315], 1287: [270, 86],
+    1321: [270, 145], 1323: [280, 195], 1330: [280, 164], 1334: [270, 103], 1633: [610, 168], 1715: [280, 150]
   };
   assert.equal(publicRecipes.length, Object.keys(expected).length);
   for (const recipe of publicRecipes) {
