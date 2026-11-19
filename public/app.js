@@ -87,7 +87,7 @@ function render(state) {
   $('disconnect').hidden = !ready || busy;
   $('phase').textContent = phaseLabels[state.phase];
   $('live-temperature').hidden = state.temperature == null;
-  $('live-temperature').textContent = state.temperature == null ? '' : `본체 수온 ${state.temperature} °C`;
+  $('temperature-reading').textContent = state.temperature == null ? '' : `${state.temperature} °C`;
   $('notice').hidden = !state.message;
   $('notice').textContent = state.message;
   $('start').disabled = !ready || locked;
@@ -105,6 +105,7 @@ function render(state) {
     if (state.level !== null) $('level').value = state.level;
   }
   document.querySelector('.recipe-settings').inert = locked;
+  document.querySelector('.mode').inert = locked;
   if (state.connection === 'pin' && !pinDialog.open) {
     pinForm.reset();
     $('pin-error').hidden = true;

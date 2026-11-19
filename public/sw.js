@@ -1,4 +1,4 @@
-const CACHE = 'smart7-offline-v1';
+const CACHE = 'smart7-offline-v2';
 const assets = [
   './', './index.html', './style.css', './app.js', './protocol.js', './recipes.js', './app.webmanifest',
   './coffee.webp', './icon-192.png', './icon-512.png'
